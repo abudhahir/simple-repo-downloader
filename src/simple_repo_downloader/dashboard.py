@@ -124,3 +124,14 @@ class Dashboard:
         )
 
         return Panel(summary_text, title="Statistics", border_style="blue")
+
+    def _build_event_log_panel(self, status: DownloadStatus, max_events: int = 10) -> Panel:
+        """Build event log panel with recent events."""
+        recent_events = status.events[-max_events:] if len(status.events) > max_events else status.events
+
+        if not recent_events:
+            event_text = "[dim]No events yet[/dim]"
+        else:
+            event_text = "\n".join(recent_events)
+
+        return Panel(event_text, title="Recent Events", border_style="yellow")

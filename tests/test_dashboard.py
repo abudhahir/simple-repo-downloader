@@ -109,3 +109,17 @@ def test_build_summary_panel():
     panel = dashboard._build_summary_panel(status)
 
     assert isinstance(panel, Panel)
+
+
+def test_build_event_log_panel():
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus
+    from rich.panel import Panel
+
+    status = DownloadStatus()
+    status.add_event("Started cloning github/torvalds/linux")
+    status.add_event("Completed github/torvalds/subsurface")
+
+    dashboard = Dashboard()
+    panel = dashboard._build_event_log_panel(status, max_events=10)
+
+    assert isinstance(panel, Panel)
