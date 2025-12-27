@@ -68,3 +68,33 @@ def test_download_status_add_event():
     assert len(status.events) == 1
     assert "Started download" in status.events[0]
     assert "]" in status.events[0]  # Has timestamp
+
+
+def test_build_repo_table():
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus, RepoStatus
+    from simple_repo_downloader.models import RepoInfo, StateEnum
+    from rich.table import Table
+
+    status = DownloadStatus()
+    repo = RepoInfo(
+        platform="github",
+        username="torvalds",
+        name="linux",
+        clone_url="https://github.com/torvalds/linux.git",
+        is_fork=False,
+        is_private=False,
+        is_archived=False,
+        size_kb=2048000,
+        default_branch="master"
+    )
+    status.repos["github/torvalds/linux"] = RepoStatus(
+        repo=repo,
+        state=StateEnum.DOWNLOADING,
+        progress_pct=45
+    )
+
+    dashboard = Dashboard()
+    table = dashboard._build_repo_table(status)
+
+    assert isinstance(table, Table)
+    assert table.row_count == 1
