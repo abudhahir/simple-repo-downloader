@@ -11,6 +11,7 @@ This document provides a complete reference for using Simple Repository Download
   - [Data Models](#data-models)
   - [API Clients](#api-clients)
   - [Download Engine](#download-engine)
+  - [Dashboard](#dashboard)
 - [Complete Examples](#complete-examples)
 - [Error Handling](#error-handling)
 - [Advanced Usage](#advanced-usage)
@@ -299,6 +300,30 @@ elif issue.issue_type == IssueType.AUTH_ERROR:
     print("Authentication required")
 ```
 
+#### `StateEnum`
+
+Enum of repository download states.
+
+**Values:**
+- `QUEUED` - Repository waiting to be downloaded
+- `DOWNLOADING` - Currently being downloaded
+- `COMPLETED` - Successfully downloaded
+- `FAILED` - Download failed
+- `PAUSED` - Download paused by user
+- `SKIPPED` - Download skipped by user
+
+**Example:**
+```python
+from simple_repo_downloader import StateEnum, RepoStatus
+
+if repo_status.state == StateEnum.DOWNLOADING:
+    print(f"Progress: {repo_status.progress_pct}%")
+elif repo_status.state == StateEnum.COMPLETED:
+    print("Download complete")
+elif repo_status.state == StateEnum.PAUSED:
+    print("Download paused - use 'resume' command")
+```
+
 #### `DownloadResult`
 
 Result of a single repository download (immutable).
@@ -561,6 +586,247 @@ for issue in results.issues:
 
 for issue_type, issues in by_type.items():
     print(f"{issue_type.value}: {len(issues)} repos")
+```
+
+### Dashboard
+
+Real-time terminal dashboard for monitoring download progress.
+
+#### `RepoStatus`
+
+Status of a single repository download.
+
+**Fields:**
+- `repo: RepoInfo` - Repository information
+- `state: StateEnum` - Current download state (QUEUED, DOWNLOADING, COMPLETED, FAILED, PAUSED, SKIPPED)
+- `progress_pct: int` - Download progress percentage (0-100)
+- `error: Optional[str]` - Error message if failed
+- `started_at: Optional[datetime]` - When download started
+- `completed_at: Optional[datetime]` - When download finished
+
+**Example:**
+```python
+from simple_repo_downloader import RepoStatus, StateEnum
+from datetime import datetime
+
+status = RepoStatus(
+    repo=repo_info,
+    state=StateEnum.DOWNLOADING,
+    progress_pct=45,
+    started_at=datetime.now()
+)
+```
+
+#### `DownloadStatus`
+
+Overall download status tracking all repositories.
+
+**Fields:**
+- `repos: Dict[str, RepoStatus]` - Dictionary mapping repo ID to status
+- `events: List[str]` - Event log with timestamps
+- `start_time: datetime` - When downloads started
+
+**Properties:**
+- `queued_count: int` - Number of queued repositories
+- `downloading_count: int` - Number of active downloads
+- `completed_count: int` - Number of completed downloads
+- `failed_count: int` - Number of failed downloads
+- `paused_count: int` - Number of paused downloads
+- `skipped_count: int` - Number of skipped downloads
+
+**Methods:**
+
+##### `add_event(message: str) -> None`
+
+Add timestamped event to log.
+
+**Parameters:**
+- `message: str` - Event message
+
+**Example:**
+```python
+from simple_repo_downloader import DownloadStatus
+
+status = DownloadStatus()
+status.add_event("Started downloading kubernetes/kubernetes")
+status.add_event("Completed torvalds/linux")
+
+# Access counts
+print(f"Completed: {status.completed_count}")
+print(f"Active: {status.downloading_count}")
+```
+
+#### `Dashboard`
+
+Interactive terminal dashboard with real-time updates.
+
+**Constructor:**
+```python
+Dashboard()
+```
+
+**Methods:**
+
+##### `run_live(status: DownloadStatus, refresh_rate: float = 0.25) -> None`
+
+Run live dashboard with automatic updates.
+
+**Parameters:**
+- `status: DownloadStatus` - Download status to display
+- `refresh_rate: float` - Update interval in seconds (default: 0.25)
+
+**Features:**
+- Real-time progress table with emoji indicators
+- Summary statistics panel
+- Event log showing recent activities
+- Command shell for interactive control
+- Automatic refresh until all downloads complete
+
+**Example:**
+```python
+import asyncio
+from simple_repo_downloader import Dashboard, DownloadStatus, RepoStatus, StateEnum
+
+async def download_with_dashboard():
+    # Initialize status
+    status = DownloadStatus()
+
+    # Add repositories to track
+    for repo in repos:
+        repo_id = f"{repo.username}/{repo.name}"
+        status.repos[repo_id] = RepoStatus(
+            repo=repo,
+            state=StateEnum.QUEUED
+        )
+
+    # Create dashboard
+    dashboard = Dashboard()
+
+    # Run dashboard in background
+    dashboard_task = asyncio.create_task(
+        dashboard.run_live(status, refresh_rate=0.5)
+    )
+
+    # Your download logic updates status.repos as needed
+    # ...
+
+    await dashboard_task
+
+asyncio.run(download_with_dashboard())
+```
+
+##### `_execute_command(cmd: str, args: List[str], status: DownloadStatus) -> Optional[str]`
+
+Execute dashboard command (internal use).
+
+**Parameters:**
+- `cmd: str` - Command name
+- `args: List[str]` - Command arguments
+- `status: DownloadStatus` - Current download status
+
+**Returns:**
+- `Optional[str]` - Response message or None
+
+**Available Commands:**
+- `pause <repo>` - Pause repository download
+- `resume <repo>` - Resume paused download
+- `skip <repo>` - Skip repository
+- `status` - Show detailed status
+- `clear-log` - Clear event log
+- `help` - Show command help
+- `quit` - Graceful shutdown
+
+##### `_build_layout(status: DownloadStatus) -> Layout`
+
+Build Rich layout for dashboard display (internal use).
+
+**Parameters:**
+- `status: DownloadStatus` - Current download status
+
+**Returns:**
+- `Layout` - Rich layout object
+
+**Layout Structure:**
+```
+┌─────────────────────────────────────┐
+│  Repository Downloads (Table)       │
+│  - Platform | User | Repo | Status  │
+│  - Progress bars for active         │
+├─────────────────────────────────────┤
+│  Statistics Panel                   │
+│  - Counts by state                  │
+│  - Elapsed time                     │
+├─────────────────────────────────────┤
+│  Recent Events (Log)                │
+│  - Last 10 events with timestamps   │
+├─────────────────────────────────────┤
+│  Command Shell                      │
+│  - Interactive command prompt       │
+└─────────────────────────────────────┘
+```
+
+**Using with Status Callbacks:**
+```python
+import asyncio
+from simple_repo_downloader import (
+    GitHubClient,
+    DownloadEngine,
+    DownloadConfig,
+    Dashboard,
+    DownloadStatus,
+    RepoStatus,
+    StateEnum
+)
+
+async def download_with_interactive_dashboard():
+    """Download with real-time dashboard."""
+    # Setup
+    status = DownloadStatus()
+    dashboard = Dashboard()
+
+    async with aiohttp.ClientSession() as session:
+        client = GitHubClient(token='ghp_token', session=session)
+        repos = await client.list_repositories('kubernetes', {})
+
+        # Initialize status tracking
+        for repo in repos:
+            repo_id = f"{repo.username}/{repo.name}"
+            status.repos[repo_id] = RepoStatus(
+                repo=repo,
+                state=StateEnum.QUEUED
+            )
+
+        # Define callback to update status
+        def on_status_change(repo: RepoInfo, new_state: StateEnum, progress: int = 0):
+            repo_id = f"{repo.username}/{repo.name}"
+            status.repos[repo_id].state = new_state
+            status.repos[repo_id].progress_pct = progress
+
+            if new_state == StateEnum.DOWNLOADING:
+                status.add_event(f"Started {repo.name}")
+            elif new_state == StateEnum.COMPLETED:
+                status.add_event(f"Completed {repo.name}")
+            elif new_state == StateEnum.FAILED:
+                status.add_event(f"Failed {repo.name}")
+
+        # Start dashboard
+        dashboard_task = asyncio.create_task(
+            dashboard.run_live(status, refresh_rate=0.5)
+        )
+
+        # Download with status callback
+        config = DownloadConfig(max_parallel=5)
+        engine = DownloadEngine(config, status_callback=on_status_change)
+        results = await engine.download_all(
+            repos,
+            token='ghp_token',
+        )
+
+        await dashboard_task
+
+        return results
+
+asyncio.run(download_with_interactive_dashboard())
 ```
 
 ## Complete Examples

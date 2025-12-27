@@ -293,6 +293,55 @@ results = await downloader.download_all(
 )
 ```
 
+## Interactive Dashboard
+
+The download process includes a real-time terminal dashboard showing:
+
+- **Progress Table**: Live status of each repository with progress bars
+- **Summary Stats**: Overall counts, active downloads, elapsed time
+- **Event Log**: Recent download events and status changes
+- **Command Shell**: Interactive commands during download
+
+### Using the Dashboard
+
+Default mode shows the dashboard:
+
+```bash
+repo-dl download github kubernetes
+```
+
+Disable dashboard with `--headless`:
+
+```bash
+repo-dl download github kubernetes --headless
+```
+
+### Available Commands
+
+During download, type commands in the shell:
+
+- `pause <repo>` - Pause a specific download
+- `resume <repo>` - Resume a paused download
+- `skip <repo>` - Skip a repository
+- `status` - Show detailed status
+- `clear-log` - Clear the event log
+- `help` - Show all commands
+- `quit` - Graceful shutdown
+
+**Example:**
+
+```bash
+# Start download
+repo-dl download github microsoft --max-parallel 10
+
+# In the dashboard shell:
+> pause vscode
+> skip deprecated-repo
+> resume vscode
+> status
+> quit
+```
+
 ## 🔐 Authentication
 
 ### GitHub Personal Access Token
@@ -633,6 +682,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Built with [aiohttp](https://docs.aiohttp.org/) for async HTTP
 - CLI powered by [Click](https://click.palletsprojects.com/)
 - Configuration using [Pydantic](https://docs.pydantic.dev/)
+- Interactive dashboard using [Rich](https://rich.readthedocs.io/)
 - Designed following TDD principles
 
 ## 📊 Project Status
@@ -643,7 +693,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ Parallel downloads
 - ✅ CLI interface
 - ✅ Configuration system
-- 🚧 Interactive dashboard (planned)
+- ✅ Interactive dashboard
 - 🚧 Resume capability (planned)
 - 🚧 Interactive error resolver (planned)
 

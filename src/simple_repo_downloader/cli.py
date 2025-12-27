@@ -1,13 +1,11 @@
 import asyncio
-import sys
 from pathlib import Path
-from typing import Optional
 
-import click
 import aiohttp
+import click
 
-from .config import AppConfig, DownloadConfig, Target, Credentials
 from .api_client import GitHubClient, GitLabClient
+from .config import AppConfig, DownloadConfig
 from .downloader import DownloadEngine
 
 
@@ -26,7 +24,8 @@ def cli():
 @click.option('--output-dir', type=click.Path(), default='./repos', help='Output directory')
 @click.option('--no-forks', is_flag=True, help='Exclude forked repositories')
 @click.option('--config', type=click.Path(exists=True), help='Config file path')
-def download(platform, username, token, max_parallel, output_dir, no_forks, config):
+@click.option('--headless', is_flag=True, help='Run without interactive dashboard')
+def download(platform, username, token, max_parallel, output_dir, no_forks, config, headless):
     """Download repositories from a platform user/org."""
 
     if config:
@@ -36,17 +35,18 @@ def download(platform, username, token, max_parallel, output_dir, no_forks, conf
     else:
         # Use CLI arguments
         asyncio.run(_download_from_args(
-            platform, username, token, max_parallel, output_dir, no_forks
+            platform, username, token, max_parallel, output_dir, no_forks, headless
         ))
 
 
 async def _download_from_args(
     platform: str,
     username: str,
-    token: Optional[str],
+    token: str | None,
     max_parallel: int,
     output_dir: str,
-    no_forks: bool
+    no_forks: bool,
+    headless: bool
 ):
     """Execute download from CLI arguments."""
     # Create download config
@@ -72,17 +72,55 @@ async def _download_from_args(
         repos = await client.list_repositories(username, filters)
         click.echo(f"Found {len(repos)} repositories")
 
-        # Download
-        engine = DownloadEngine(download_config)
-        click.echo(f"Downloading with {max_parallel} parallel workers...")
-        results = await engine.download_all(repos, token=token)
 
-        # Report results
-        click.echo(f"\n✓ Successfully downloaded: {len(results.successful)}")
-        if results.issues:
-            click.echo(f"✗ Issues encountered: {len(results.issues)}")
-            for issue in results.issues:
-                click.echo(f"  - {issue.repo.name}: {issue.message}")
+        # Handle empty repository list
+        
+        if not repos:
+            click.echo("No repositories to download. Exiting.")
+            return
+
+        if not headless:
+            # Import dashboard components
+            from .dashboard import Dashboard, DownloadStatus, RepoStatus
+            from .models import StateEnum
+
+            # Create status with all repos
+            status = DownloadStatus()
+            for repo in repos:
+                repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
+                status.repos[repo_id] = RepoStatus(repo=repo, state=StateEnum.QUEUED)
+
+            # Create callback
+            async def status_callback(repo, state, progress):
+                repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
+                if repo_id in status.repos:
+                    # Convert string state to StateEnum
+                    state_enum = getattr(StateEnum, state.upper(), StateEnum.QUEUED)
+                    status.repos[repo_id].state = state_enum
+                    status.repos[repo_id].progress_pct = progress
+                    status.add_event(f"{state.capitalize()}: {repo_id}")
+
+            # Create engine with callback
+            engine = DownloadEngine(download_config, status_callback=status_callback)
+
+            # Run dashboard and downloads concurrently
+            dashboard = Dashboard()
+            await asyncio.gather(
+                engine.download_all(repos, token=token),
+                dashboard.run_live(status)
+            )
+        else:
+            # Headless mode (keep existing code)
+            engine = DownloadEngine(download_config)
+            click.echo(f"Downloading with {max_parallel} parallel workers...")
+            results = await engine.download_all(repos, token=token)
+
+            # Report results
+            click.echo(f"\n✓ Successfully downloaded: {len(results.successful)}")
+            if results.issues:
+                click.echo(f"✗ Issues encountered: {len(results.issues)}")
+                for issue in results.issues:
+                    click.echo(f"  - {issue.repo.name}: {issue.message}")
 
 
 async def _download_from_config(app_config: AppConfig):
@@ -100,6 +138,12 @@ async def _download_from_config(app_config: AppConfig):
             click.echo(f"Fetching {target.platform} repositories for {target.username}...")
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
+
+
+            # Handle empty repository list
+            if not repos:
+                click.echo("No repositories to download. Skipping.")
+                continue
 
             engine = DownloadEngine(app_config.download)
             results = await engine.download_all(repos, token=token)

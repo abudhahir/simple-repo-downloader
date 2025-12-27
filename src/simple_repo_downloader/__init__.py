@@ -8,6 +8,7 @@ from .models import (
     DownloadIssue,
     IssueType,
     RateLimitInfo,
+    StateEnum,
 )
 from .config import (
     AppConfig,
@@ -24,6 +25,11 @@ from .downloader import (
     DownloadEngine,
     DownloadResults,
 )
+from .dashboard import (
+    Dashboard,
+    RepoStatus,
+    DownloadStatus,
+)
 
 __all__ = [
     "__version__",
@@ -33,6 +39,7 @@ __all__ = [
     "DownloadIssue",
     "IssueType",
     "RateLimitInfo",
+    "StateEnum",
     # Config
     "AppConfig",
     "DownloadConfig",
@@ -45,4 +52,8 @@ __all__ = [
     # Downloader
     "DownloadEngine",
     "DownloadResults",
+    # Dashboard
+    "Dashboard",
+    "RepoStatus",
+    "DownloadStatus",
 ]
