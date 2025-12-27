@@ -85,6 +85,22 @@ Available Commands:
             return "", []
         return parts[0], parts[1:]
 
+    async def execute_command(self, cmd: str, args: list[str], status: DownloadStatus) -> Optional[str]:
+        """
+        Execute a dashboard command.
+        
+        Public API for executing interactive dashboard commands.
+        
+        Args:
+            cmd: Command name (e.g., 'pause', 'resume', 'status')
+            args: Command arguments (e.g., repository ID)
+            status: Current download status
+            
+        Returns:
+            Command result message or None
+        """
+        return await self._execute_command(cmd, args, status)
+
     async def _execute_command(self, cmd: str, args: list[str], status: DownloadStatus) -> Optional[str]:
         """Execute a dashboard command."""
         if cmd == "help":
