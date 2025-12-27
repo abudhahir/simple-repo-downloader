@@ -118,4 +118,4 @@ async def test_download_with_status_callback():
         assert len(status_updates) > 0
         # Should have downloading and completed states
         states = [update[1] for update in status_updates]
-        assert "downloading" in states or "completed" in states
+        assert "downloading" in states and "completed" in states
