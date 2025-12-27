@@ -242,8 +242,11 @@ Available Commands:
                 # Update display
                 live.update(self._build_layout(status))
 
-                # Check if all downloads complete
-                if status.downloading_count == 0 and status.queued_count == 0:
+                # Check if all downloads complete - all repos must be in terminal states
+                # Terminal states are: completed, failed, or skipped
+                total_repos = len(status.repos)
+                terminal_count = status.completed_count + status.failed_count + status.skipped_count
+                if total_repos > 0 and terminal_count == total_repos:
                     break
 
                 await asyncio.sleep(refresh_rate)

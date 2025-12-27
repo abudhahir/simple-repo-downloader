@@ -180,3 +180,71 @@ async def test_execute_pause_command():
 
     assert "Paused" in result
     assert status.repos["github/user/repo"].state == StateEnum.PAUSED
+
+
+@pytest.mark.asyncio
+async def test_run_live_exit_condition_with_paused_repos():
+    """Test that dashboard doesn't exit when repos are paused."""
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus, RepoStatus
+    from simple_repo_downloader.models import RepoInfo, StateEnum
+    import asyncio
+
+    repo1 = RepoInfo(
+        platform="github", username="user", name="repo1",
+        clone_url="url1", is_fork=False, is_private=False,
+        is_archived=False, size_kb=1024, default_branch="main"
+    )
+    repo2 = RepoInfo(
+        platform="github", username="user", name="repo2",
+        clone_url="url2", is_fork=False, is_private=False,
+        is_archived=False, size_kb=1024, default_branch="main"
+    )
+    
+    dashboard = Dashboard()
+    
+    # Test 1: Dashboard should not exit when there are paused repos
+    status1 = DownloadStatus()
+    status1.repos["github/user/repo1"] = RepoStatus(repo=repo1, state=StateEnum.PAUSED)
+    status1.repos["github/user/repo2"] = RepoStatus(repo=repo2, state=StateEnum.COMPLETED)
+    
+    # Run the dashboard in a task and verify it doesn't exit on its own
+    task1 = asyncio.create_task(dashboard.run_live(status1, refresh_rate=0.1))
+    await asyncio.sleep(0.3)  # Let it run a few iterations
+    
+    # Task should still be running because repo1 is paused (not terminal)
+    assert not task1.done()
+    
+    # Cancel the task since it won't exit naturally
+    task1.cancel()
+    try:
+        await task1
+    except asyncio.CancelledError:
+        pass
+    
+    # Test 2: Dashboard should exit when all repos are in terminal states
+    status2 = DownloadStatus()
+    status2.repos["github/user/repo1"] = RepoStatus(repo=repo1, state=StateEnum.COMPLETED)
+    status2.repos["github/user/repo2"] = RepoStatus(repo=repo2, state=StateEnum.FAILED)
+    
+    # Dashboard should exit quickly now that all repos are in terminal states
+    task2 = asyncio.create_task(dashboard.run_live(status2, refresh_rate=0.1))
+    await asyncio.wait_for(task2, timeout=1.0)  # Should complete quickly
+    assert task2.done() and not task2.cancelled()
+    
+    # Test 3: Dashboard should not exit when there are queued or downloading repos
+    status3 = DownloadStatus()
+    status3.repos["github/user/repo1"] = RepoStatus(repo=repo1, state=StateEnum.DOWNLOADING)
+    status3.repos["github/user/repo2"] = RepoStatus(repo=repo2, state=StateEnum.COMPLETED)
+    
+    task3 = asyncio.create_task(dashboard.run_live(status3, refresh_rate=0.1))
+    await asyncio.sleep(0.3)  # Let it run a few iterations
+    
+    # Task should still be running because repo1 is downloading (not terminal)
+    assert not task3.done()
+    
+    # Cancel the task
+    task3.cancel()
+    try:
+        await task3
+    except asyncio.CancelledError:
+        pass
