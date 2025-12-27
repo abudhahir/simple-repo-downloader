@@ -108,3 +108,86 @@ class GitHubClient(PlatformClient):
                 limit=core['limit'],
                 reset_timestamp=core['reset']
             )
+
+
+class GitLabClient(PlatformClient):
+    """GitLab API client."""
+
+    def __init__(
+        self,
+        token: Optional[str],
+        session: aiohttp.ClientSession,
+        base_url: str = "https://gitlab.com"
+    ):
+        super().__init__(token, session)
+        self.base_url = base_url
+        self.headers = {}
+        if token:
+            self.headers['PRIVATE-TOKEN'] = token
+
+    async def list_repositories(
+        self,
+        username: str,
+        filters: Dict[str, bool]
+    ) -> List[RepoInfo]:
+        """Fetch all projects for a GitLab user/group."""
+        repos = []
+        page = 1
+
+        while True:
+            # Try user endpoint first, fall back to group
+            url = f"{self.base_url}/api/v4/users/{username}/projects"
+            params = {'per_page': 100, 'page': page}
+
+            async with self.session.get(url, headers=self.headers, params=params) as response:
+                if response.status == 404:
+                    # Try group endpoint
+                    url = f"{self.base_url}/api/v4/groups/{username}/projects"
+                    async with self.session.get(url, headers=self.headers, params=params) as group_response:
+                        if group_response.status != 200:
+                            break
+                        data = await group_response.json()
+                        total_pages = int(group_response.headers.get('X-Total-Pages', '1'))
+                elif response.status != 200:
+                    break
+                else:
+                    data = await response.json()
+                    total_pages = int(response.headers.get('X-Total-Pages', '1'))
+
+                if not data:
+                    break
+
+                for item in data:
+                    # Apply filters
+                    is_fork = item.get('forked_from_project') is not None
+                    if filters.get('forks') == False and is_fork:
+                        continue
+                    if filters.get('archived') == False and item.get('archived', False):
+                        continue
+
+                    repo = RepoInfo(
+                        platform='gitlab',
+                        username=item['namespace']['path'],
+                        name=item['name'],
+                        clone_url=item['http_url_to_repo'],
+                        is_fork=is_fork,
+                        is_private=item['visibility'] != 'public',
+                        is_archived=item.get('archived', False),
+                        size_kb=item.get('statistics', {}).get('repository_size', 0) // 1024,
+                        default_branch=item.get('default_branch', 'main')
+                    )
+                    repos.append(repo)
+
+                # Check if more pages
+                if page >= total_pages:
+                    break
+
+                page += 1
+
+        return repos
+
+    async def get_rate_limit(self) -> RateLimitInfo:
+        """Get GitLab rate limit status."""
+        # GitLab doesn't have a dedicated rate limit endpoint
+        # Return dummy data for now
+        return RateLimitInfo(remaining=600, limit=600, reset_timestamp=0)
