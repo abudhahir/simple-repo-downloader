@@ -1,0 +1,9 @@
+{
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true,
+    "context7@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "explanatory-output-style@claude-plugins-official": true,
+    "taches-cc-resources@taches-cc-resources": true
+  }
+}

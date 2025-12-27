@@ -1,0 +1,63 @@
+# Simple Repository Downloader - Configuration Example
+# Save this file and run: repo-dl download --config config.yaml
+
+# Authentication credentials
+# Use environment variables for security: ${GITHUB_TOKEN}
+credentials:
+  # GitHub Personal Access Token
+  # Generate at: https://github.com/settings/tokens
+  # Required scopes: repo (for private repos), public_repo (for public only)
+  github_token: ${GITHUB_TOKEN}
+
+  # GitLab Personal Access Token
+  # Generate at: https://gitlab.com/-/profile/personal_access_tokens
+  # Required scopes: read_api, read_repository
+  gitlab_token: ${GITLAB_TOKEN}
+
+# Download configuration
+download:
+  # Base directory for all downloaded repositories
+  # Structure will be: base_directory/platform/username/repo-name
+  base_directory: ./repos
+
+  # Maximum number of concurrent downloads
+  # Range: 1-20 (recommended: 3-10 depending on bandwidth)
+  max_parallel: 5
+
+  # Include forked repositories (can be overridden per target)
+  include_forks: true
+
+  # Include private repositories (requires valid token)
+  include_private: true
+
+# List of platforms and users/organizations to download from
+targets:
+  # Example 1: Download all repos from a GitHub user, excluding forks
+  - platform: github
+    username: torvalds
+    filters:
+      forks: false        # Exclude forked repositories
+      archived: false     # Exclude archived repositories
+
+  # Example 2: Download from a GitHub organization, include everything
+  - platform: github
+    username: microsoft
+    filters:
+      forks: true
+      archived: true
+
+  # Example 3: Download from GitLab user
+  - platform: gitlab
+    username: gitlab-org
+
+  # Example 4: Download from another GitLab user with filters
+  - platform: gitlab
+    username: some-username
+    filters:
+      forks: false
+      archived: false
+
+# Note: For self-hosted GitLab instances, you can specify base_url:
+# - platform: gitlab
+#   base_url: https://gitlab.mycompany.com
+#   username: my-team
