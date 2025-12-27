@@ -132,7 +132,8 @@ Available Commands:
             return f"Error: repo {repo_id} not found"
 
         elif cmd == "quit":
-            return "QUIT"  # Special signal
+            # Quit is not handled as a special signal here; inform the user how to exit.
+            return "Quit command is not supported; use Ctrl+C to exit the dashboard."
 
         else:
             return f"Unknown command: {cmd}. Type 'help' for available commands."
