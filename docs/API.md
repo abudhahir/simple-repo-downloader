@@ -715,17 +715,16 @@ async def download_with_dashboard():
 asyncio.run(download_with_dashboard())
 ```
 
-##### `_execute_command(cmd: str, args: List[str], status: DownloadStatus) -> Optional[str]`
+##### `execute_command(cmd_str: str, status: DownloadStatus) -> Optional[str]`
 
-Execute dashboard command (internal use).
+Execute a dashboard command from a command string.
 
 **Parameters:**
-- `cmd: str` - Command name
-- `args: List[str]` - Command arguments
-- `status: DownloadStatus` - Current download status
+- `cmd_str: str` - Command string (e.g., "pause github/user/repo0", "status", "help")
+- `status: DownloadStatus` - Current download status to operate on
 
 **Returns:**
-- `Optional[str]` - Response message or None
+- `Optional[str]` - Response message from the command, or None if command is empty
 
 **Available Commands:**
 - `pause <repo>` - Pause repository download
@@ -735,6 +734,43 @@ Execute dashboard command (internal use).
 - `clear-log` - Clear event log
 - `help` - Show command help
 - `quit` - Graceful shutdown
+
+**Example:**
+```python
+import asyncio
+from simple_repo_downloader import Dashboard, DownloadStatus, RepoStatus, StateEnum
+
+async def interactive_example():
+    dashboard = Dashboard()
+    status = DownloadStatus()
+    
+    # Add some repos to status
+    # ... (setup code)
+    
+    # Execute commands
+    result = await dashboard.execute_command("status", status)
+    print(result)  # "Queued: 3, Downloading: 1, ..."
+    
+    result = await dashboard.execute_command("pause github/user/repo0", status)
+    print(result)  # "Paused github/user/repo0"
+    
+    result = await dashboard.execute_command("help", status)
+    print(result)  # Shows available commands
+
+asyncio.run(interactive_example())
+```
+
+##### `_execute_command(cmd: str, args: List[str], status: DownloadStatus) -> Optional[str]`
+
+Execute dashboard command (internal use - use `execute_command()` instead).
+
+**Parameters:**
+- `cmd: str` - Command name
+- `args: List[str]` - Command arguments
+- `status: DownloadStatus` - Current download status
+
+**Returns:**
+- `Optional[str]` - Response message or None
 
 ##### `_build_layout(status: DownloadStatus) -> Layout`
 
