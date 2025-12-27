@@ -1,4 +1,5 @@
 # src/simple_repo_downloader/dashboard.py
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -6,6 +7,8 @@ from .models import RepoInfo, StateEnum
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.layout import Layout
+from rich.live import Live
 
 @dataclass
 class RepoStatus:
@@ -207,3 +210,40 @@ Available Commands:
             event_text = "\n".join(recent_events)
 
         return Panel(event_text, title="Recent Events", border_style="yellow")
+
+    def _build_layout(self, status: DownloadStatus) -> Layout:
+        """Build complete dashboard layout."""
+        layout = Layout()
+
+        # Split into upper and lower sections
+        layout.split_column(
+            Layout(name="main", ratio=3),
+            Layout(name="footer", size=5)
+        )
+
+        # Upper section: table and summary
+        layout["main"].split_column(
+            Layout(self._build_repo_table(status), name="table", ratio=2),
+            Layout(self._build_summary_panel(status), name="summary", size=4)
+        )
+
+        # Footer: events and command prompt
+        layout["footer"].split_column(
+            Layout(self._build_event_log_panel(status), name="events", size=4),
+            Layout(Panel("Type 'help' for commands", title="Command Shell"), name="shell", size=1)
+        )
+
+        return layout
+
+    async def run_live(self, status: DownloadStatus, refresh_rate: float = 0.25):
+        """Run live dashboard with updates."""
+        with Live(self._build_layout(status), console=self.console, refresh_per_second=4) as live:
+            while True:
+                # Update display
+                live.update(self._build_layout(status))
+
+                # Check if all downloads complete
+                if status.downloading_count == 0 and status.queued_count == 0:
+                    break
+
+                await asyncio.sleep(refresh_rate)
