@@ -820,7 +820,7 @@ async def download_with_interactive_dashboard():
         results = await engine.download_all(
             repos,
             token='ghp_token',
-            callback=on_status_change
+            progress_callback=on_status_change
         )
 
         await dashboard_task

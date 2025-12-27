@@ -55,7 +55,7 @@ class DownloadStatus:
     def skipped_count(self) -> int:
         return self._count_by_state(StateEnum.SKIPPED)
 
-    def add_event(self, message: str):
+    def add_event(self, message: str) -> None:
         """Add event to log with timestamp."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.events.append(f"[{timestamp}] {message}")
@@ -75,7 +75,7 @@ Available Commands:
   quit           - Graceful shutdown
 """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.console = Console()
 
     def _parse_command(self, cmd_str: str) -> tuple[str, list[str]]:

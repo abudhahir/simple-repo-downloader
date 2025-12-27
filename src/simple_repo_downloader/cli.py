@@ -101,7 +101,7 @@ async def _download_from_args(
             # Run dashboard and downloads concurrently
             dashboard = Dashboard()
             await asyncio.gather(
-                engine.download_all(repos, token),
+                engine.download_all(repos, token=token),
                 dashboard.run_live(status)
             )
         else:
