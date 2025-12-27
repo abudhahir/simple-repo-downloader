@@ -114,6 +114,10 @@ async def test_download_with_status_callback():
 
         results = await engine.download_all(repos)
 
+        # Verify download was successful
+        assert len(results.successful) == 1
+        assert len(results.issues) == 0
+
         # Should have received status updates
         assert len(status_updates) > 0
         # Should have downloading and completed states
