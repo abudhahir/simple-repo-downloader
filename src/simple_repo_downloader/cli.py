@@ -1,13 +1,11 @@
 import asyncio
-import sys
 from pathlib import Path
-from typing import Optional
 
-import click
 import aiohttp
+import click
 
-from .config import AppConfig, DownloadConfig, Target, Credentials
 from .api_client import GitHubClient, GitLabClient
+from .config import AppConfig, DownloadConfig
 from .downloader import DownloadEngine
 
 
@@ -44,7 +42,7 @@ def download(platform, username, token, max_parallel, output_dir, no_forks, conf
 async def _download_from_args(
     platform: str,
     username: str,
-    token: Optional[str],
+    token: str | None,
     max_parallel: int,
     output_dir: str,
     no_forks: bool,
@@ -74,7 +72,9 @@ async def _download_from_args(
         repos = await client.list_repositories(username, filters)
         click.echo(f"Found {len(repos)} repositories")
 
-        # Check if no repositories found
+
+        # Handle empty repository list
+        
         if not repos:
             click.echo("No repositories to download. Exiting.")
             return
@@ -139,9 +139,10 @@ async def _download_from_config(app_config: AppConfig):
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
 
-            # Check if no repositories found
+
+            # Handle empty repository list
             if not repos:
-                click.echo("No repositories to download for this target. Skipping.")
+                click.echo("No repositories to download. Skipping.")
                 continue
 
             engine = DownloadEngine(app_config.download)
