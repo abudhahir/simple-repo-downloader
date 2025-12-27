@@ -1,10 +1,18 @@
 import asyncio
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
 from .config import DownloadConfig
 from .models import DownloadIssue, DownloadResult, RepoInfo, IssueType
+
+
+@dataclass
+class DownloadResults:
+    """Results from a batch download operation."""
+    successful: List[DownloadResult]
+    issues: List[DownloadIssue]
 
 
 class DownloadEngine:
@@ -78,3 +86,92 @@ class DownloadEngine:
 
         if result.returncode != 0:
             raise RuntimeError(f"Git clone failed: {result.stderr}")
+
+    async def _worker(
+        self,
+        worker_id: int,
+        callback: Optional[Callable],
+        token: Optional[str]
+    ) -> None:
+        """Worker coroutine for processing download queue."""
+        while True:
+            try:
+                repo = await self.download_queue.get()
+
+                try:
+                    async with self.semaphore:
+                        await self._clone_repo(repo, callback, token)
+                        self.results.append(
+                            DownloadResult(repo=repo, success=True)
+                        )
+                except FileExistsError as e:
+                    self.issues.append(
+                        DownloadIssue(
+                            repo=repo,
+                            issue_type=IssueType.CONFLICT,
+                            message=str(e),
+                            existing_path=self.config.base_directory / repo.platform / repo.username / repo.name
+                        )
+                    )
+                except Exception as e:
+                    issue_type = self._classify_error(e)
+                    self.issues.append(
+                        DownloadIssue(
+                            repo=repo,
+                            issue_type=issue_type,
+                            message=str(e)
+                        )
+                    )
+                finally:
+                    self.download_queue.task_done()
+            except asyncio.CancelledError:
+                break
+
+    def _classify_error(self, error: Exception) -> IssueType:
+        """Classify an error into an IssueType."""
+        error_str = str(error).lower()
+
+        if 'permission denied' in error_str or 'unauthorized' in error_str:
+            return IssueType.AUTH_ERROR
+        elif 'network' in error_str or 'connection' in error_str:
+            return IssueType.NETWORK_ERROR
+        elif 'git' in error_str:
+            return IssueType.GIT_ERROR
+        else:
+            return IssueType.GIT_ERROR
+
+    async def download_all(
+        self,
+        repos: List[RepoInfo],
+        progress_callback: Optional[Callable] = None,
+        token: Optional[str] = None
+    ) -> DownloadResults:
+        """Download all repositories in parallel."""
+        # Clear previous results
+        self.results = []
+        self.issues = []
+
+        # Populate queue
+        for repo in repos:
+            await self.download_queue.put(repo)
+
+        # Spawn workers
+        workers = [
+            asyncio.create_task(self._worker(i, progress_callback, token))
+            for i in range(self.config.max_parallel)
+        ]
+
+        # Wait for all downloads to complete
+        await self.download_queue.join()
+
+        # Cancel workers
+        for worker in workers:
+            worker.cancel()
+
+        # Wait for workers to finish
+        await asyncio.gather(*workers, return_exceptions=True)
+
+        return DownloadResults(
+            successful=self.results,
+            issues=self.issues
+        )
