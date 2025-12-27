@@ -75,7 +75,7 @@ async def _download_from_args(
         click.echo(f"Found {len(repos)} repositories")
 
         # Check if no repositories found
-        if len(repos) == 0:
+        if not repos:
             click.echo("No repositories to download. Exiting.")
             return
 
@@ -140,7 +140,7 @@ async def _download_from_config(app_config: AppConfig):
             click.echo(f"Found {len(repos)} repositories")
 
             # Check if no repositories found
-            if len(repos) == 0:
+            if not repos:
                 click.echo("No repositories to download for this target. Skipping.")
                 continue
 
