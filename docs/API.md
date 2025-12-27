@@ -816,11 +816,10 @@ async def download_with_interactive_dashboard():
 
         # Download with status callback
         config = DownloadConfig(max_parallel=5)
-        engine = DownloadEngine(config)
+        engine = DownloadEngine(config, status_callback=on_status_change)
         results = await engine.download_all(
             repos,
             token='ghp_token',
-            progress_callback=on_status_change
         )
 
         await dashboard_task
