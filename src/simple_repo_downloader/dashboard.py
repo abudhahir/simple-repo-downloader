@@ -156,9 +156,9 @@ Available Commands:
             elif repo_status.state == StateEnum.FAILED:
                 status_text = "❌ Failed"
             elif repo_status.state == StateEnum.PAUSED:
-                status_text = "⏸️  Paused"
+                status_text = "⏸  Paused"
             elif repo_status.state == StateEnum.SKIPPED:
-                status_text = "⏭️  Skipped"
+                status_text = "⏭  Skipped"
             else:  # QUEUED
                 status_text = "⏳ Queued"
 
