@@ -61,6 +61,19 @@ class DownloadStatus:
 class Dashboard:
     """Real-time terminal dashboard for download progress."""
 
+    COMMANDS_HELP = """
+Available Commands:
+  pause <repo>         - Pause specific repository download
+  resume <repo>        - Resume paused repository
+  skip <repo>          - Skip repository (won't download)
+  set max-parallel <n> - Adjust concurrent downloads
+  filter <key>:<value> - Filter table view
+  clear-log            - Clear event log
+  status               - Show detailed status
+  help                 - Show this help
+  quit                 - Graceful shutdown
+"""
+
     def __init__(self):
         self.console = Console()
 
@@ -70,6 +83,58 @@ class Dashboard:
         if not parts:
             return "", []
         return parts[0], parts[1:]
+
+    async def _execute_command(self, cmd: str, args: list[str], status: DownloadStatus) -> Optional[str]:
+        """Execute a dashboard command."""
+        if cmd == "help":
+            return self.COMMANDS_HELP
+
+        elif cmd == "clear-log":
+            status.events.clear()
+            return "Event log cleared"
+
+        elif cmd == "status":
+            return (
+                f"Queued: {status.queued_count}, "
+                f"Downloading: {status.downloading_count}, "
+                f"Completed: {status.completed_count}, "
+                f"Failed: {status.failed_count}"
+            )
+
+        elif cmd == "pause":
+            if not args:
+                return "Error: pause requires repo ID"
+            repo_id = args[0]
+            if repo_id in status.repos:
+                status.repos[repo_id].state = StateEnum.PAUSED
+                return f"Paused {repo_id}"
+            return f"Error: repo {repo_id} not found"
+
+        elif cmd == "resume":
+            if not args:
+                return "Error: resume requires repo ID"
+            repo_id = args[0]
+            if repo_id in status.repos:
+                if status.repos[repo_id].state == StateEnum.PAUSED:
+                    status.repos[repo_id].state = StateEnum.QUEUED
+                    return f"Resumed {repo_id}"
+                return f"Error: {repo_id} is not paused"
+            return f"Error: repo {repo_id} not found"
+
+        elif cmd == "skip":
+            if not args:
+                return "Error: skip requires repo ID"
+            repo_id = args[0]
+            if repo_id in status.repos:
+                status.repos[repo_id].state = StateEnum.SKIPPED
+                return f"Skipped {repo_id}"
+            return f"Error: repo {repo_id} not found"
+
+        elif cmd == "quit":
+            return "QUIT"  # Special signal
+
+        else:
+            return f"Unknown command: {cmd}. Type 'help' for available commands."
 
     def _build_repo_table(self, status: DownloadStatus) -> Table:
         """Build Rich table of repository statuses."""

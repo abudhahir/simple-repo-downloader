@@ -144,3 +144,39 @@ def test_parse_command():
     cmd, args = dashboard._parse_command("help")
     assert cmd == "help"
     assert args == []
+
+
+import pytest
+
+@pytest.mark.asyncio
+async def test_execute_help_command():
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus
+
+    status = DownloadStatus()
+    dashboard = Dashboard()
+
+    result = await dashboard._execute_command("help", [], status)
+
+    assert result is not None
+    assert "pause" in result.lower()
+    assert "resume" in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_execute_pause_command():
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus, RepoStatus
+    from simple_repo_downloader.models import RepoInfo, StateEnum
+
+    status = DownloadStatus()
+    repo = RepoInfo(
+        platform="github", username="user", name="repo",
+        clone_url="url", is_fork=False, is_private=False,
+        is_archived=False, size_kb=1024, default_branch="main"
+    )
+    status.repos["github/user/repo"] = RepoStatus(repo=repo, state=StateEnum.DOWNLOADING)
+
+    dashboard = Dashboard()
+    result = await dashboard._execute_command("pause", ["github/user/repo"], status)
+
+    assert "Paused" in result
+    assert status.repos["github/user/repo"].state == StateEnum.PAUSED
