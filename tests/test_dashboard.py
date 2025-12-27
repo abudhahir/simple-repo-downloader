@@ -123,3 +123,24 @@ def test_build_event_log_panel():
     panel = dashboard._build_event_log_panel(status, max_events=10)
 
     assert isinstance(panel, Panel)
+
+
+def test_parse_command():
+    from simple_repo_downloader.dashboard import Dashboard
+
+    dashboard = Dashboard()
+
+    # Test pause command
+    cmd, args = dashboard._parse_command("pause github/torvalds/linux")
+    assert cmd == "pause"
+    assert args == ["github/torvalds/linux"]
+
+    # Test set command
+    cmd, args = dashboard._parse_command("set max-parallel 10")
+    assert cmd == "set"
+    assert args == ["max-parallel", "10"]
+
+    # Test help
+    cmd, args = dashboard._parse_command("help")
+    assert cmd == "help"
+    assert args == []

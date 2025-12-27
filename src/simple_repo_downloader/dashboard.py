@@ -64,6 +64,13 @@ class Dashboard:
     def __init__(self):
         self.console = Console()
 
+    def _parse_command(self, cmd_str: str) -> tuple[str, list[str]]:
+        """Parse command string into command and arguments."""
+        parts = cmd_str.strip().split()
+        if not parts:
+            return "", []
+        return parts[0], parts[1:]
+
     def _build_repo_table(self, status: DownloadStatus) -> Table:
         """Build Rich table of repository statuses."""
         table = Table(title="Repository Downloads", show_header=True, header_style="bold magenta")
