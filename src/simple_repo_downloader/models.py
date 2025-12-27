@@ -31,6 +31,17 @@ class IssueType(Enum):
     RATE_LIMIT = "rate_limit"
 
 
+class StateEnum(Enum):
+    """Repository download states."""
+
+    QUEUED = "queued"
+    DOWNLOADING = "downloading"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PAUSED = "paused"
+    SKIPPED = "skipped"
+
+
 @dataclass(frozen=True)
 class DownloadResult:
     """Result of a repository download attempt."""

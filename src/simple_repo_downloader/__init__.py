@@ -8,6 +8,7 @@ from .models import (
     DownloadIssue,
     IssueType,
     RateLimitInfo,
+    StateEnum,
 )
 from .config import (
     AppConfig,
@@ -33,6 +34,7 @@ __all__ = [
     "DownloadIssue",
     "IssueType",
     "RateLimitInfo",
+    "StateEnum",
     # Config
     "AppConfig",
     "DownloadConfig",
