@@ -18,12 +18,13 @@ class DownloadResults:
 class DownloadEngine:
     """Engine for parallel repository downloads."""
 
-    def __init__(self, config: DownloadConfig):
+    def __init__(self, config: DownloadConfig, status_callback: Optional[Callable] = None):
         self.config = config
         self.semaphore = asyncio.Semaphore(config.max_parallel)
         self.download_queue: asyncio.Queue[RepoInfo] = asyncio.Queue()
         self.results: List[DownloadResult] = []
         self.issues: List[DownloadIssue] = []
+        self.status_callback = status_callback
 
     def _inject_token(self, clone_url: str, platform: str, token: Optional[str]) -> str:
         """Inject authentication token into clone URL."""
@@ -98,12 +99,19 @@ class DownloadEngine:
             try:
                 repo = await self.download_queue.get()
 
+                # Notify status: starting download
+                if self.status_callback:
+                    await self.status_callback(repo, "downloading", 0)
+
                 try:
                     async with self.semaphore:
                         await self._clone_repo(repo, callback, token)
                         self.results.append(
                             DownloadResult(repo=repo, success=True)
                         )
+                        # Notify status: completed
+                        if self.status_callback:
+                            await self.status_callback(repo, "completed", 100)
                 except FileExistsError as e:
                     self.issues.append(
                         DownloadIssue(
@@ -113,6 +121,9 @@ class DownloadEngine:
                             existing_path=self.config.base_directory / repo.platform / repo.username / repo.name
                         )
                     )
+                    # Notify status: failed
+                    if self.status_callback:
+                        await self.status_callback(repo, "failed", 0)
                 except Exception as e:
                     issue_type = self._classify_error(e)
                     self.issues.append(
@@ -122,6 +133,9 @@ class DownloadEngine:
                             message=str(e)
                         )
                     )
+                    # Notify status: failed
+                    if self.status_callback:
+                        await self.status_callback(repo, "failed", 0)
                 finally:
                     self.download_queue.task_done()
             except asyncio.CancelledError:
