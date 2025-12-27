@@ -74,6 +74,11 @@ async def _download_from_args(
         repos = await client.list_repositories(username, filters)
         click.echo(f"Found {len(repos)} repositories")
 
+        # Check if no repositories found
+        if len(repos) == 0:
+            click.echo("No repositories to download. Exiting.")
+            return
+
         if not headless:
             # Import dashboard components
             from .dashboard import Dashboard, DownloadStatus, RepoStatus
@@ -133,6 +138,11 @@ async def _download_from_config(app_config: AppConfig):
             click.echo(f"Fetching {target.platform} repositories for {target.username}...")
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
+
+            # Check if no repositories found
+            if len(repos) == 0:
+                click.echo("No repositories to download for this target. Skipping.")
+                continue
 
             engine = DownloadEngine(app_config.download)
             results = await engine.download_all(repos, token=token)
