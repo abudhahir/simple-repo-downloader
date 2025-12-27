@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from .models import RepoInfo, StateEnum
 from rich.console import Console
 from rich.table import Table
+from rich.panel import Panel
 
 @dataclass
 class RepoStatus:
@@ -107,3 +108,19 @@ class Dashboard:
             )
 
         return table
+
+    def _build_summary_panel(self, status: DownloadStatus) -> Panel:
+        """Build summary statistics panel."""
+        elapsed = datetime.now() - status.start_time
+        elapsed_str = str(elapsed).split('.')[0]  # Remove microseconds
+
+        summary_text = (
+            f"[bold]Summary:[/bold] "
+            f"{status.downloading_count} downloading | "
+            f"{status.completed_count} completed | "
+            f"{status.failed_count} failed | "
+            f"{status.queued_count} queued\n"
+            f"[bold]Elapsed:[/bold] {elapsed_str}"
+        )
+
+        return Panel(summary_text, title="Statistics", border_style="blue")

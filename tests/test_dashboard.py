@@ -98,3 +98,14 @@ def test_build_repo_table():
 
     assert isinstance(table, Table)
     assert table.row_count == 1
+
+
+def test_build_summary_panel():
+    from simple_repo_downloader.dashboard import Dashboard, DownloadStatus
+    from rich.panel import Panel
+
+    status = DownloadStatus()
+    dashboard = Dashboard()
+    panel = dashboard._build_summary_panel(status)
+
+    assert isinstance(panel, Panel)
