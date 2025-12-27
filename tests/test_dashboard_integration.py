@@ -3,15 +3,14 @@ import pytest
 from simple_repo_downloader.dashboard import Dashboard, DownloadStatus, RepoStatus
 from simple_repo_downloader.models import RepoInfo, StateEnum
 
-NUM_TEST_REPOS = 3
-
 @pytest.mark.asyncio
 async def test_dashboard_basic_commands():
     """Test basic dashboard commands (status and pause)."""
+    num_test_repos = 3
     status = DownloadStatus()
 
     # Add test repos
-    for i in range(NUM_TEST_REPOS):
+    for i in range(num_test_repos):
         repo = RepoInfo(
             platform="github",
             username="user",
@@ -26,7 +25,7 @@ async def test_dashboard_basic_commands():
         status.repos[f"github/user/repo{i}"] = RepoStatus(repo=repo, state=StateEnum.QUEUED)
 
     # Verify initial states
-    for i in range(NUM_TEST_REPOS):
+    for i in range(num_test_repos):
         assert status.repos[f"github/user/repo{i}"].state == StateEnum.QUEUED
 
     # Simulate download progress
