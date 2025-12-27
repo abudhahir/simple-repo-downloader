@@ -1,8 +1,10 @@
 # tests/test_config.py
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from simple_repo_downloader.config import (
@@ -159,3 +161,36 @@ def test_app_config_with_env_vars(monkeypatch):
         targets=[Target(platform='github', username='testuser')]
     )
     assert config.credentials.github_token == 'ghp_env_token'
+
+
+def test_load_config_from_yaml():
+    config_data = {
+        'credentials': {
+            'github_token': 'ghp_test',
+            'gitlab_token': 'glpat_test'
+        },
+        'download': {
+            'base_directory': './test_repos',
+            'max_parallel': 10
+        },
+        'targets': [
+            {
+                'platform': 'github',
+                'username': 'torvalds',
+                'filters': {'forks': False}
+            }
+        ]
+    }
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        yaml.dump(config_data, f)
+        config_path = Path(f.name)
+
+    try:
+        config = AppConfig.from_yaml(config_path)
+        assert config.credentials.github_token == 'ghp_test'
+        assert config.download.max_parallel == 10
+        assert len(config.targets) == 1
+        assert config.targets[0].username == 'torvalds'
+    finally:
+        config_path.unlink()

@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
+import yaml
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -54,3 +55,18 @@ class AppConfig(BaseModel):
     credentials: Credentials
     download: DownloadConfig
     targets: List[Target]
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "AppConfig":
+        """Load configuration from YAML file."""
+        with open(path, 'r') as f:
+            data = yaml.safe_load(f)
+        return cls(**data)
+
+    def to_yaml(self, path: Path) -> None:
+        """Save configuration to YAML file."""
+        with open(path, 'w') as f:
+            # Convert to dict, handle Path objects
+            data = self.model_dump(mode='python')
+            data['download']['base_directory'] = str(data['download']['base_directory'])
+            yaml.dump(data, f, default_flow_style=False)
