@@ -59,3 +59,12 @@ def test_download_status_counts():
     assert status.failed_count == 1
     assert status.paused_count == 1
     assert status.skipped_count == 1
+
+
+def test_download_status_add_event():
+    status = DownloadStatus()
+    status.add_event("Started download")
+
+    assert len(status.events) == 1
+    assert "Started download" in status.events[0]
+    assert "]" in status.events[0]  # Has timestamp
