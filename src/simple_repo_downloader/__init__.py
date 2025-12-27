@@ -2,7 +2,47 @@
 
 __version__ = "0.1.0"
 
-# Main exports will be added as we implement
+from .models import (
+    RepoInfo,
+    DownloadResult,
+    DownloadIssue,
+    IssueType,
+    RateLimitInfo,
+)
+from .config import (
+    AppConfig,
+    DownloadConfig,
+    Target,
+    Credentials,
+)
+from .api_client import (
+    PlatformClient,
+    GitHubClient,
+    GitLabClient,
+)
+from .downloader import (
+    DownloadEngine,
+    DownloadResults,
+)
+
 __all__ = [
     "__version__",
+    # Models
+    "RepoInfo",
+    "DownloadResult",
+    "DownloadIssue",
+    "IssueType",
+    "RateLimitInfo",
+    # Config
+    "AppConfig",
+    "DownloadConfig",
+    "Target",
+    "Credentials",
+    # API Clients
+    "PlatformClient",
+    "GitHubClient",
+    "GitLabClient",
+    # Downloader
+    "DownloadEngine",
+    "DownloadResults",
 ]
