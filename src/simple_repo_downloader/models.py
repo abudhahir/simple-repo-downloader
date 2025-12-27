@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 
-@dataclass
+@dataclass(frozen=True)
 class RepoInfo:
     """Information about a repository to be downloaded."""
 
@@ -31,7 +31,7 @@ class IssueType(Enum):
     RATE_LIMIT = "rate_limit"
 
 
-@dataclass
+@dataclass(frozen=True)
 class DownloadResult:
     """Result of a repository download attempt."""
 
@@ -48,10 +48,10 @@ class DownloadIssue:
     issue_type: IssueType
     message: str
     existing_path: Optional[Path] = None
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=lambda: datetime.now())
 
 
-@dataclass
+@dataclass(frozen=True)
 class RateLimitInfo:
     """Rate limit information from API."""
 
