@@ -237,7 +237,8 @@ Available Commands:
 
     async def run_live(self, status: DownloadStatus, refresh_rate: float = 0.25):
         """Run live dashboard with updates."""
-        with Live(self._build_layout(status), console=self.console, refresh_per_second=4) as live:
+        refresh_per_sec = int(1 / refresh_rate) if refresh_rate > 0 else 4
+        with Live(self._build_layout(status), console=self.console, refresh_per_second=refresh_per_sec) as live:
             while True:
                 # Update display
                 live.update(self._build_layout(status))
