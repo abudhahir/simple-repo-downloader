@@ -1,6 +1,5 @@
 # tests/test_dashboard_integration.py
 import pytest
-import asyncio
 from simple_repo_downloader.dashboard import Dashboard, DownloadStatus, RepoStatus
 from simple_repo_downloader.models import RepoInfo, StateEnum
 
