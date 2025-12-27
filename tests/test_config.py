@@ -194,3 +194,69 @@ def test_load_config_from_yaml():
         assert config.targets[0].username == 'torvalds'
     finally:
         config_path.unlink()
+
+
+def test_load_config_from_yaml_file_not_found():
+    """Test that from_yaml raises FileNotFoundError with clear message."""
+    non_existent_path = Path('/tmp/non_existent_config_12345.yaml')
+    with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+        AppConfig.from_yaml(non_existent_path)
+
+
+def test_yaml_round_trip():
+    """Test that config can be saved and loaded without data loss."""
+    # Create a config
+    original_config = AppConfig(
+        credentials=Credentials(
+            github_token='ghp_test123',
+            gitlab_token='glpat_test456'
+        ),
+        download=DownloadConfig(
+            base_directory=Path('/custom/repos'),
+            max_parallel=8,
+            include_forks=False,
+            include_private=True
+        ),
+        targets=[
+            Target(platform='github', username='user1', filters={'forks': False}),
+            Target(platform='gitlab', username='user2')
+        ]
+    )
+
+    # Save to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        temp_path = Path(f.name)
+
+    try:
+        original_config.to_yaml(temp_path)
+
+        # Load it back
+        loaded_config = AppConfig.from_yaml(temp_path)
+
+        # Compare
+        assert loaded_config.credentials.github_token == original_config.credentials.github_token
+        assert loaded_config.credentials.gitlab_token == original_config.credentials.gitlab_token
+        assert loaded_config.download.base_directory == original_config.download.base_directory
+        assert loaded_config.download.max_parallel == original_config.download.max_parallel
+        assert loaded_config.download.include_forks == original_config.download.include_forks
+        assert loaded_config.download.include_private == original_config.download.include_private
+        assert len(loaded_config.targets) == len(original_config.targets)
+        assert loaded_config.targets[0].platform == original_config.targets[0].platform
+        assert loaded_config.targets[0].username == original_config.targets[0].username
+        assert loaded_config.targets[0].filters == original_config.targets[0].filters
+    finally:
+        temp_path.unlink()
+
+
+def test_load_config_invalid_yaml():
+    """Test that from_yaml raises ValueError for malformed YAML."""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        # Write invalid YAML (unbalanced brackets, bad indentation, etc.)
+        f.write("credentials:\n  github_token: 'test\n  invalid: [\n")
+        config_path = Path(f.name)
+
+    try:
+        with pytest.raises(ValueError, match="Invalid YAML in configuration file"):
+            AppConfig.from_yaml(config_path)
+    finally:
+        config_path.unlink()

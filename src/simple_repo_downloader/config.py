@@ -59,14 +59,23 @@ class AppConfig(BaseModel):
     @classmethod
     def from_yaml(cls, path: Path) -> "AppConfig":
         """Load configuration from YAML file."""
-        with open(path, 'r') as f:
-            data = yaml.safe_load(f)
+        try:
+            with open(path, 'r') as f:
+                data = yaml.safe_load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found: {path}")
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in configuration file: {e}")
+
         return cls(**data)
 
     def to_yaml(self, path: Path) -> None:
         """Save configuration to YAML file."""
-        with open(path, 'w') as f:
-            # Convert to dict, handle Path objects
-            data = self.model_dump(mode='python')
-            data['download']['base_directory'] = str(data['download']['base_directory'])
-            yaml.dump(data, f, default_flow_style=False)
+        try:
+            with open(path, 'w') as f:
+                # Convert to dict, handle Path objects
+                data = self.model_dump(mode='python')
+                data['download']['base_directory'] = str(data['download']['base_directory'])
+                yaml.dump(data, f, default_flow_style=False)
+        except (OSError, IOError) as e:
+            raise IOError(f"Failed to write configuration file: {e}")
