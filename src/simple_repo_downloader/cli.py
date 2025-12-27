@@ -72,7 +72,9 @@ async def _download_from_args(
         repos = await client.list_repositories(username, filters)
         click.echo(f"Found {len(repos)} repositories")
 
+
         # Handle empty repository list
+        
         if not repos:
             click.echo("No repositories to download. Exiting.")
             return
@@ -136,6 +138,7 @@ async def _download_from_config(app_config: AppConfig):
             click.echo(f"Fetching {target.platform} repositories for {target.username}...")
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
+
 
             # Handle empty repository list
             if not repos:
