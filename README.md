@@ -324,6 +324,7 @@ During download, type commands in the shell:
 - `resume <repo>` - Resume a paused download
 - `skip <repo>` - Skip a repository
 - `status` - Show detailed status
+- `clear-log` - Clear the event log
 - `help` - Show all commands
 - `quit` - Graceful shutdown
 

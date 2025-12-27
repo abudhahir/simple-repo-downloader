@@ -728,12 +728,12 @@ Execute dashboard command (internal use).
 - `Optional[str]` - Response message or None
 
 **Available Commands:**
-- `help` - Show command help
 - `pause <repo>` - Pause repository download
 - `resume <repo>` - Resume paused download
 - `skip <repo>` - Skip repository
 - `status` - Show detailed status
 - `clear-log` - Clear event log
+- `help` - Show command help
 - `quit` - Graceful shutdown
 
 ##### `_build_layout(status: DownloadStatus) -> Layout`

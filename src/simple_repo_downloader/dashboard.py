@@ -66,15 +66,13 @@ class Dashboard:
 
     COMMANDS_HELP = """
 Available Commands:
-  pause <repo>         - Pause specific repository download
-  resume <repo>        - Resume paused repository
-  skip <repo>          - Skip repository (won't download)
-  set max-parallel <n> - Adjust concurrent downloads
-  filter <key>:<value> - Filter table view
-  clear-log            - Clear event log
-  status               - Show detailed status
-  help                 - Show this help
-  quit                 - Graceful shutdown
+  pause <repo>   - Pause specific repository download
+  resume <repo>  - Resume paused repository
+  skip <repo>    - Skip repository (won't download)
+  clear-log      - Clear event log
+  status         - Show detailed status
+  help           - Show this help
+  quit           - Graceful shutdown
 """
 
     def __init__(self):
