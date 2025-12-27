@@ -71,6 +71,7 @@ dmypy.json
 .repo-dl-session.json
 .repo-dl-errors.json
 repos/
+.worktrees/
 
 # Distribution
 *.whl
