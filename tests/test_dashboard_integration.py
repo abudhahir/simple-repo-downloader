@@ -33,11 +33,11 @@ async def test_dashboard_basic_commands():
     dashboard = Dashboard()
 
     # Test command execution
-    result = await dashboard._execute_command("status", [], status)
+    result = await dashboard.execute_command("status", [], status)
     assert "Queued: 3" in result
 
     # Test pause
-    result = await dashboard._execute_command("pause", ["github/user/repo0"], status)
+    result = await dashboard.execute_command("pause", ["github/user/repo0"], status)
     assert "Paused" in result
     assert status.repos["github/user/repo0"].state == StateEnum.PAUSED
 
