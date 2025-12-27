@@ -5,10 +5,6 @@ from typing import Dict, List, Optional
 from .models import RepoInfo, StateEnum
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich.layout import Layout
-from rich.live import Live
-from rich.progress import Progress, BarColumn, TextColumn
 
 @dataclass
 class RepoStatus:
@@ -93,8 +89,10 @@ class Dashboard:
 
             # Progress bar
             if repo_status.state == StateEnum.DOWNLOADING:
-                bar_width = int(repo_status.progress_pct / 100 * 10)
-                progress_text = f"{'█' * bar_width}{'▌' if bar_width < 10 else ''}{'░' * (10 - bar_width)} {repo_status.progress_pct}%"
+                bar_fraction = repo_status.progress_pct / 100 * 10
+                bar_width = int(bar_fraction)
+                has_partial = (bar_fraction - bar_width) >= 0.5
+                progress_text = f"{'█' * bar_width}{'▌' if has_partial else ''}{'░' * (10 - bar_width - (1 if has_partial else 0))} {repo_status.progress_pct}%"
             elif repo_status.state == StateEnum.COMPLETED:
                 progress_text = "██████████ 100%"
             else:
