@@ -137,6 +137,11 @@ async def _download_from_config(app_config: AppConfig):
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
 
+            # Handle empty repository list
+            if not repos:
+                click.echo("No repositories to download. Skipping.")
+                continue
+
             engine = DownloadEngine(app_config.download)
             results = await engine.download_all(repos, token=token)
 
