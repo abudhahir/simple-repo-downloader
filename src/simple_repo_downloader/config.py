@@ -161,6 +161,42 @@ class AppConfig(BaseModel):
                 f"but target uses {platform}"
             )
 
+    def resolve_targets(self) -> List[ResolvedTarget]:
+        """Convert targets to normalized format with resolved credentials."""
+        resolved = []
+
+        if isinstance(self.targets, list):
+            # Flat format
+            for target in self.targets:
+                token = self._resolve_token(target.platform, target.credential)
+                resolved.append(ResolvedTarget(
+                    platform=target.platform,
+                    username=target.username,
+                    token=token,
+                    filters=target.filters
+                ))
+        else:
+            # Grouped format - TODO in next task
+            pass
+
+        return resolved
+
+    def _resolve_token(self, platform: str, credential: Optional[str]) -> Optional[str]:
+        """Resolve token for a platform/credential combination."""
+        # Priority 1: Explicit credential profile
+        if credential:
+            return self.credentials.profiles[credential].token
+
+        # Priority 2: Legacy platform token
+        if platform == 'github' and self.credentials.github_token:
+            return self.credentials.github_token
+        if platform == 'gitlab' and self.credentials.gitlab_token:
+            return self.credentials.gitlab_token
+
+        # Priority 3: Environment variables
+        env_var = f"{platform.upper()}_TOKEN"
+        return os.environ.get(env_var)
+
     @classmethod
     def from_yaml(cls, path: Path) -> "AppConfig":
         """Load configuration from YAML file."""
