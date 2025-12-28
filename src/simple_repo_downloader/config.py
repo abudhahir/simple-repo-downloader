@@ -3,20 +3,20 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Union
+from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 def resolve_env_var(value: str) -> str:
     """Resolve ${VAR_NAME} syntax to environment variable value."""
     if not isinstance(value, str):
-        return value
+        return value  # type: ignore[return-value]
 
     pattern = r'\$\{([^}]+)\}'
 
-    def replace_var(match):
+    def replace_var(match: re.Match[str]) -> str:
         var_name = match.group(1)
         return os.environ.get(var_name, match.group(0))
 
@@ -32,8 +32,8 @@ class ResolvedTarget:
     """
     platform: str
     username: str
-    token: Optional[str]
-    filters: Dict[str, bool]
+    token: str | None
+    filters: dict[str, bool]
 
 
 class CredentialProfile(BaseModel):
@@ -60,12 +60,12 @@ class CredentialProfile(BaseModel):
 class TargetGroup(BaseModel):
     """Group of usernames sharing a credential."""
     credential: str = Field(min_length=1)
-    usernames: List[str] = Field(min_length=1)
-    filters: Dict[str, bool] = Field(default_factory=dict)
+    usernames: list[str] = Field(min_length=1)
+    filters: dict[str, bool] = Field(default_factory=dict)
 
     @field_validator('credential', 'usernames')
     @classmethod
-    def validate_non_whitespace(cls, v: Union[str, List[str]], info: ValidationInfo) -> Union[str, List[str]]:
+    def validate_non_whitespace(cls, v: str | list[str], info: ValidationInfo) -> str | list[str]:
         """Validate that credential and usernames are not empty or whitespace-only."""
         field_name = info.field_name
 
@@ -82,15 +82,15 @@ class TargetGroup(BaseModel):
 class Credentials(BaseModel):
     """Authentication credentials for platforms."""
     # Legacy format (backward compatible)
-    github_token: Optional[str] = None
-    gitlab_token: Optional[str] = None
+    github_token: str | None = None
+    gitlab_token: str | None = None
 
     # New named profiles
-    profiles: Dict[str, CredentialProfile] = Field(default_factory=dict)
+    profiles: dict[str, CredentialProfile] = Field(default_factory=dict)
 
     @field_validator('github_token', 'gitlab_token', mode='before')
     @classmethod
-    def resolve_env_vars(cls, v):
+    def resolve_env_vars(cls, v: str | None) -> str | None:
         if v is None:
             return v
         return resolve_env_var(v)
@@ -108,19 +108,19 @@ class Target(BaseModel):
     """A platform/username target to download from."""
     platform: Literal['github', 'gitlab']
     username: str
-    credential: Optional[str] = None
-    filters: Dict[str, bool] = Field(default_factory=dict)
+    credential: str | None = None
+    filters: dict[str, bool] = Field(default_factory=dict)
 
 
 class AppConfig(BaseModel):
     """Complete application configuration."""
     credentials: Credentials
     download: DownloadConfig
-    targets: Union[List[Target], Dict[str, List[TargetGroup]]]
+    targets: list[Target] | dict[str, list[TargetGroup]]
 
     @field_validator('targets')
     @classmethod
-    def validate_targets(cls, v: Union[List[Target], Dict[str, List[TargetGroup]]], info: ValidationInfo) -> Union[List[Target], Dict[str, List[TargetGroup]]]:
+    def validate_targets(cls, v: list[Target] | dict[str, list[TargetGroup]], info: ValidationInfo) -> list[Target] | dict[str, list[TargetGroup]]:
         """Validate targets format and credential references."""
         credentials = info.data.get('credentials')
         if credentials is None:
@@ -161,7 +161,7 @@ class AppConfig(BaseModel):
                 f"but target uses {platform}"
             )
 
-    def resolve_targets(self) -> List[ResolvedTarget]:
+    def resolve_targets(self) -> list[ResolvedTarget]:
         """Convert targets to normalized format with resolved credentials."""
         resolved = []
 
@@ -190,7 +190,7 @@ class AppConfig(BaseModel):
 
         return resolved
 
-    def _resolve_token(self, platform: str, credential: Optional[str]) -> Optional[str]:
+    def _resolve_token(self, platform: str, credential: str | None) -> str | None:
         """Resolve token for a platform/credential combination."""
         # Priority 1: Explicit credential profile
         if credential:
@@ -210,12 +210,12 @@ class AppConfig(BaseModel):
     def from_yaml(cls, path: Path) -> "AppConfig":
         """Load configuration from YAML file."""
         try:
-            with open(path, 'r') as f:
+            with open(path) as f:
                 data = yaml.safe_load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file not found: {path}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Configuration file not found: {path}") from e
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in configuration file: {e}")
+            raise ValueError(f"Invalid YAML in configuration file: {e}") from e
 
         return cls(**data)
 
@@ -227,5 +227,5 @@ class AppConfig(BaseModel):
                 data = self.model_dump(mode='python')
                 data['download']['base_directory'] = str(data['download']['base_directory'])
                 yaml.dump(data, f, default_flow_style=False)
-        except (OSError, IOError) as e:
-            raise IOError(f"Failed to write configuration file: {e}")
+        except OSError as e:
+            raise OSError(f"Failed to write configuration file: {e}") from e

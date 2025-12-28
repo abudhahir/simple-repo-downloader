@@ -7,14 +7,15 @@ import aiohttp
 import click
 
 from .api_client import GitHubClient, GitLabClient
-from .config import AppConfig, DownloadConfig, ResolvedTarget
+from .config import AppConfig, DownloadConfig
 from .downloader import DownloadEngine
+from .models import RepoInfo
 from .progress import ProgressPrinter
 
 
 @click.group()
 @click.version_option(version='0.1.0')
-def cli():
+def cli() -> None:
     """Simple Repository Downloader - Download all repos from GitHub/GitLab users."""
     pass
 
@@ -28,7 +29,16 @@ def cli():
 @click.option('--no-forks', is_flag=True, help='Exclude forked repositories')
 @click.option('--config', type=click.Path(exists=True), help='Config file path')
 @click.option('--verbose', is_flag=True, help='Show verbose output')
-def download(platform, username, token, max_parallel, output_dir, no_forks, config, verbose):
+def download(
+    platform: str,
+    username: str,
+    token: str | None,
+    max_parallel: int,
+    output_dir: str,
+    no_forks: bool,
+    config: str | None,
+    verbose: bool
+) -> None:
     """Download repositories from a platform user/org."""
 
     if config:
@@ -72,7 +82,7 @@ async def _download_from_args(
     output_dir: str,
     no_forks: bool,
     verbose: bool
-):
+) -> None:
     """Execute download from CLI arguments."""
     from .api_client import APIError
 
@@ -89,6 +99,7 @@ async def _download_from_args(
 
     # Create appropriate client
     async with aiohttp.ClientSession() as session:
+        client: GitHubClient | GitLabClient
         if platform == 'github':
             client = GitHubClient(token=token, session=session)
         else:
@@ -155,7 +166,12 @@ async def _download_from_args(
         repo_counter = [0]  # Use list for mutable counter in closure
 
         # Create callback
-        async def status_callback(repo, state, progress, error=None):
+        async def status_callback(
+            repo: RepoInfo,
+            state: str,
+            progress: int,
+            error: str | None = None
+        ) -> None:
             repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
             if repo_id in status.repos:
                 # Update status
@@ -189,7 +205,7 @@ async def _download_from_args(
             click.echo(f"\nLog saved to: {log_file}")
 
 
-async def _download_from_config(app_config: AppConfig):
+async def _download_from_config(app_config: AppConfig) -> None:
     """Execute download from configuration file."""
     # Resolve all targets to normalized format with credentials
     resolved_targets = app_config.resolve_targets()
@@ -197,6 +213,7 @@ async def _download_from_config(app_config: AppConfig):
     async with aiohttp.ClientSession() as session:
         for target in resolved_targets:
             # Create appropriate client with resolved token
+            client: GitHubClient | GitLabClient
             if target.platform == 'github':
                 client = GitHubClient(token=target.token, session=session)
             else:
@@ -217,7 +234,7 @@ async def _download_from_config(app_config: AppConfig):
             click.echo(f"✓ Downloaded: {len(results.successful)}, Issues: {len(results.issues)}")
 
 
-def main():
+def main() -> None:
     """Entry point for CLI."""
     cli()
 
