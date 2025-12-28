@@ -26,7 +26,6 @@ from .downloader import (
     DownloadResults,
 )
 from .dashboard import (
-    Dashboard,
     RepoStatus,
     DownloadStatus,
 )
@@ -52,8 +51,7 @@ __all__ = [
     # Downloader
     "DownloadEngine",
     "DownloadResults",
-    # Dashboard
-    "Dashboard",
+    # Status Tracking
     "RepoStatus",
     "DownloadStatus",
 ]
