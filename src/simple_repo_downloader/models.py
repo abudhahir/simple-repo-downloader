@@ -40,6 +40,10 @@ class StateEnum(Enum):
     FAILED = "failed"
     PAUSED = "paused"
     SKIPPED = "skipped"
+    UPDATED = "updated"
+    UP_TO_DATE = "up_to_date"
+    UNCOMMITTED_CHANGES = "uncommitted_changes"
+    AHEAD = "ahead"
 
 
 @dataclass(frozen=True)
