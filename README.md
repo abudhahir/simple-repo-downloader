@@ -141,6 +141,7 @@ repo-dl download <platform> <username> [OPTIONS]
 | `--output-dir PATH` | Output directory | `--output-dir ~/repos` |
 | `--no-forks` | Exclude forked repositories | `--no-forks` |
 | `--config PATH` | Use config file | `--config myconfig.yaml` |
+| `--headless` | Run without interactive dashboard | `--headless` |
 
 #### Examples
 
