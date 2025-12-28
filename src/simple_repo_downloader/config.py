@@ -94,6 +94,7 @@ class Target(BaseModel):
     """A platform/username target to download from."""
     platform: Literal['github', 'gitlab']
     username: str
+    credential: Optional[str] = None
     filters: Dict[str, bool] = Field(default_factory=dict)
 
 

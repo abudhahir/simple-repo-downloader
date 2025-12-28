@@ -173,6 +173,22 @@ def test_target_invalid_platform():
         Target(platform='bitbucket', username='user')
 
 
+def test_target_with_credential_reference():
+    """Test target can reference a credential profile."""
+    target = Target(
+        platform='github',
+        username='testuser',
+        credential='my-github'
+    )
+    assert target.credential == 'my-github'
+
+
+def test_target_credential_defaults_to_none():
+    """Test that credential field defaults to None when not specified."""
+    target = Target(platform='github', username='testuser')
+    assert target.credential is None
+
+
 # Test AppConfig
 def test_app_config_complete():
     config = AppConfig(
