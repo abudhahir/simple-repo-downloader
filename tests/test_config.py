@@ -399,3 +399,37 @@ def test_app_config_validates_flat_format_credential():
                 )
             ]
         )
+
+
+def test_load_grouped_format_from_yaml(tmp_path):
+    """Test loading grouped target format from YAML."""
+    yaml_content = """
+credentials:
+  profiles:
+    my-github:
+      platform: github
+      username: testuser
+      token: ghp_test123
+
+download:
+  base_directory: ./repos
+
+targets:
+  github:
+    - credential: my-github
+      usernames:
+        - user1
+        - user2
+      filters:
+        forks: false
+"""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml_content)
+
+    config = AppConfig.from_yaml(config_file)
+
+    assert isinstance(config.targets, dict)
+    assert 'github' in config.targets
+    assert len(config.targets['github']) == 1
+    assert config.targets['github'][0].credential == 'my-github'
+    assert len(config.targets['github'][0].usernames) == 2
