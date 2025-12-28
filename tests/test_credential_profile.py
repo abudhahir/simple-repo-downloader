@@ -47,3 +47,43 @@ def test_credential_profile_gitlab():
         token='glpat_test456'
     )
     assert profile.platform == 'gitlab'
+
+
+def test_credential_profile_empty_username_fails():
+    """Test that empty username is rejected."""
+    with pytest.raises(ValidationError):
+        CredentialProfile(
+            platform='github',
+            username='',
+            token='ghp_test123'
+        )
+
+
+def test_credential_profile_empty_token_fails():
+    """Test that empty token is rejected."""
+    with pytest.raises(ValidationError):
+        CredentialProfile(
+            platform='github',
+            username='testuser',
+            token=''
+        )
+
+
+def test_credential_profile_whitespace_username_fails():
+    """Test that whitespace-only username is rejected."""
+    with pytest.raises(ValidationError, match="cannot be empty or whitespace"):
+        CredentialProfile(
+            platform='github',
+            username='   ',
+            token='ghp_test123'
+        )
+
+
+def test_credential_profile_whitespace_token_fails():
+    """Test that whitespace-only token is rejected."""
+    with pytest.raises(ValidationError, match="cannot be empty or whitespace"):
+        CredentialProfile(
+            platform='github',
+            username='testuser',
+            token='   '
+        )

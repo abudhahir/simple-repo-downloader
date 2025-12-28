@@ -25,8 +25,16 @@ def resolve_env_var(value: str) -> str:
 class CredentialProfile(BaseModel):
     """Named credential profile for a platform."""
     platform: Literal['github', 'gitlab']
-    username: str
-    token: str
+    username: str = Field(min_length=1)
+    token: str = Field(min_length=1)
+
+    @field_validator('username', 'token')
+    @classmethod
+    def validate_non_whitespace(cls, v: str, info) -> str:
+        """Validate that field is not empty or whitespace-only."""
+        if not v.strip():
+            raise ValueError(f"{info.field_name} cannot be empty or whitespace")
+        return v
 
     @field_validator('token', mode='before')
     @classmethod
