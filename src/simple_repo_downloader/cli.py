@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 import aiohttp
@@ -7,6 +8,7 @@ import click
 from .api_client import GitHubClient, GitLabClient
 from .config import AppConfig, DownloadConfig
 from .downloader import DownloadEngine
+from .progress import ProgressPrinter
 
 
 @click.group()
@@ -25,7 +27,8 @@ def cli():
 @click.option('--no-forks', is_flag=True, help='Exclude forked repositories')
 @click.option('--config', type=click.Path(exists=True), help='Config file path')
 @click.option('--headless', is_flag=True, help='Run without interactive dashboard')
-def download(platform, username, token, max_parallel, output_dir, no_forks, config, headless):
+@click.option('--verbose', is_flag=True, help='Show verbose output')
+def download(platform, username, token, max_parallel, output_dir, no_forks, config, headless, verbose):
     """Download repositories from a platform user/org."""
 
     if config:
@@ -35,7 +38,7 @@ def download(platform, username, token, max_parallel, output_dir, no_forks, conf
     else:
         # Use CLI arguments
         asyncio.run(_download_from_args(
-            platform, username, token, max_parallel, output_dir, no_forks, headless
+            platform, username, token, max_parallel, output_dir, no_forks, headless, verbose
         ))
 
 
@@ -46,7 +49,8 @@ async def _download_from_args(
     max_parallel: int,
     output_dir: str,
     no_forks: bool,
-    headless: bool
+    headless: bool,
+    verbose: bool
 ):
     """Execute download from CLI arguments."""
     # Create download config
@@ -72,55 +76,64 @@ async def _download_from_args(
         repos = await client.list_repositories(username, filters)
         click.echo(f"Found {len(repos)} repositories")
 
-
         # Handle empty repository list
-        
         if not repos:
             click.echo("No repositories to download. Exiting.")
             return
 
-        if not headless:
-            # Import dashboard components
-            from .dashboard import Dashboard, DownloadStatus, RepoStatus
-            from .models import StateEnum
+        # Create log file path
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_dir = Path.home() / ".simple-repo-downloader" / "logs"
+        log_file = log_dir / f"download-{timestamp}.log"
 
-            # Create status with all repos
-            status = DownloadStatus()
-            for repo in repos:
-                repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
-                status.repos[repo_id] = RepoStatus(repo=repo, state=StateEnum.QUEUED)
+        # Create progress printer
+        printer = ProgressPrinter(log_file=log_file)
+        printer.print_start(repos, max_parallel)
 
-            # Create callback
-            async def status_callback(repo, state, progress):
-                repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
-                if repo_id in status.repos:
-                    # Convert string state to StateEnum
-                    state_enum = getattr(StateEnum, state.upper(), StateEnum.QUEUED)
-                    status.repos[repo_id].state = state_enum
-                    status.repos[repo_id].progress_pct = progress
-                    status.add_event(f"{state.capitalize()}: {repo_id}")
+        # Create status tracker
+        from .dashboard import DownloadStatus, RepoStatus
+        from .models import StateEnum
+        status = DownloadStatus()
+        for repo in repos:
+            repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
+            status.repos[repo_id] = RepoStatus(repo=repo, state=StateEnum.QUEUED)
 
-            # Create engine with callback
-            engine = DownloadEngine(download_config, status_callback=status_callback)
+        # Track current repo index
+        repo_counter = [0]  # Use list for mutable counter in closure
 
-            # Run dashboard and downloads concurrently
-            dashboard = Dashboard()
-            await asyncio.gather(
-                engine.download_all(repos, token=token),
-                dashboard.run_live(status)
-            )
-        else:
-            # Headless mode (keep existing code)
-            engine = DownloadEngine(download_config)
-            click.echo(f"Downloading with {max_parallel} parallel workers...")
-            results = await engine.download_all(repos, token=token)
+        # Create callback
+        async def status_callback(repo, state, progress, error=None):
+            repo_id = f"{repo.platform}/{repo.username}/{repo.name}"
+            if repo_id in status.repos:
+                # Update status
+                state_enum = getattr(StateEnum, state.upper(), StateEnum.QUEUED)
+                status.repos[repo_id].state = state_enum
+                status.repos[repo_id].progress_pct = progress
 
-            # Report results
-            click.echo(f"\n✓ Successfully downloaded: {len(results.successful)}")
-            if results.issues:
-                click.echo(f"✗ Issues encountered: {len(results.issues)}")
-                for issue in results.issues:
-                    click.echo(f"  - {issue.repo.name}: {issue.message}")
+                # Print update for terminal states only
+                if state_enum in [StateEnum.COMPLETED, StateEnum.FAILED, StateEnum.UPDATED,
+                                 StateEnum.UP_TO_DATE, StateEnum.UNCOMMITTED_CHANGES, StateEnum.AHEAD]:
+                    repo_counter[0] += 1
+                    message = error if error else "Cloned successfully"
+                    printer.print_repo_update(
+                        current=repo_counter[0],
+                        total=len(repos),
+                        repo=repo,
+                        state=state_enum,
+                        message=message
+                    )
+
+        # Create engine with callback
+        engine = DownloadEngine(download_config, status_callback=status_callback)
+
+        # Run download
+        await engine.download_all(repos, token=token)
+
+        # Print summary
+        printer.print_summary(status)
+
+        if verbose:
+            click.echo(f"\nLog saved to: {log_file}")
 
 
 async def _download_from_config(app_config: AppConfig):
