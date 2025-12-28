@@ -149,3 +149,50 @@ def test_resolve_targets_multiple_groups_same_platform():
     assert resolved[0].token == 'ghp_personal'
     assert resolved[1].token == 'ghp_personal'
     assert resolved[2].token == 'ghp_work'
+
+
+def test_token_resolution_priority():
+    """Test token resolution follows correct priority."""
+    os.environ['GITHUB_TOKEN'] = 'ghp_env'
+
+    config = AppConfig(
+        credentials=Credentials(
+            github_token='ghp_legacy',
+            profiles={
+                'my-github': CredentialProfile(
+                    platform='github',
+                    username='test',
+                    token='ghp_profile'
+                )
+            }
+        ),
+        download=DownloadConfig(),
+        targets=[
+            Target(platform='github', username='user1', credential='my-github'),
+            Target(platform='github', username='user2'),
+        ]
+    )
+
+    resolved = config.resolve_targets()
+
+    # Profile takes priority when specified
+    assert resolved[0].token == 'ghp_profile'
+    # Legacy takes priority over env when no credential specified
+    assert resolved[1].token == 'ghp_legacy'
+
+    del os.environ['GITHUB_TOKEN']
+
+
+def test_token_resolution_no_token():
+    """Test token resolution when no token available."""
+    config = AppConfig(
+        credentials=Credentials(),
+        download=DownloadConfig(),
+        targets=[
+            Target(platform='github', username='user1')
+        ]
+    )
+
+    resolved = config.resolve_targets()
+
+    assert resolved[0].token is None
