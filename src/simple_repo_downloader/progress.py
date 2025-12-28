@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from rich.console import Console
 
-from .models import RepoInfo
+from .models import RepoInfo, StateEnum
 
 
 class ProgressPrinter:
@@ -32,6 +32,38 @@ class ProgressPrinter:
 
         self.console.print(message)
         self._log(message)
+
+    def print_repo_update(
+        self,
+        current: int,
+        total: int,
+        repo: RepoInfo,
+        state: StateEnum,
+        message: str
+    ) -> None:
+        """Print single repo progress update."""
+        # Status emoji mapping
+        status_emoji = {
+            StateEnum.COMPLETED: "✓",
+            StateEnum.DOWNLOADING: "⏳",
+            StateEnum.FAILED: "❌",
+            StateEnum.UPDATED: "🔄",
+            StateEnum.UP_TO_DATE: "✓",
+            StateEnum.UNCOMMITTED_CHANGES: "⚠",
+            StateEnum.AHEAD: "↑",
+            StateEnum.QUEUED: "⏳",
+            StateEnum.PAUSED: "⏸",
+            StateEnum.SKIPPED: "⏭",
+        }
+
+        emoji = status_emoji.get(state, "•")
+        visibility = "PRIVATE" if repo.is_private else "PUBLIC"
+        repo_path = f"{repo.platform}/{repo.username}/{repo.name}"
+
+        line = f"[{current}/{total}] {emoji} [{visibility}] {repo_path} - {message}"
+
+        self.console.print(line)
+        self._log(line)
 
     def _log(self, message: str) -> None:
         """Write message to log file with timestamp."""
