@@ -27,6 +27,7 @@ A powerful, efficient tool for bulk downloading all repositories from GitHub or 
 - [Usage](#usage)
   - [CLI Usage](#cli-usage)
   - [Configuration File](#configuration-file)
+  - [Multi-Credential Configuration](#multi-credential-configuration)
   - [Python API](#python-api)
 - [Authentication](#authentication)
 - [Advanced Usage](#advanced-usage)
@@ -230,6 +231,172 @@ targets:
     filters:
       forks: false
 EOF
+```
+
+### Multi-Credential Configuration
+
+For advanced use cases involving multiple accounts (personal + work) or different tokens per platform, use **named credential profiles** with the **grouped targets format**.
+
+#### Named Credential Profiles
+
+Define reusable authentication profiles instead of single tokens per platform:
+
+```yaml
+credentials:
+  profiles:
+    # Personal GitHub account
+    personal-github:
+      platform: github
+      username: your-personal-username
+      token: ${GITHUB_PERSONAL_TOKEN}
+
+    # Work GitHub account
+    work-github:
+      platform: github
+      username: your-work-username
+      token: ${GITHUB_WORK_TOKEN}
+
+    # GitLab account
+    my-gitlab:
+      platform: gitlab
+      username: your-gitlab-username
+      token: ${GITLAB_TOKEN}
+```
+
+#### Grouped Targets Format
+
+Group targets by platform and reference credential profiles:
+
+```yaml
+targets:
+  github:
+    # Personal projects - exclude forks
+    - credential: personal-github
+      usernames:
+        - torvalds
+        - kubernetes
+        - docker
+      filters:
+        forks: false
+        archived: false
+
+    # Work organization - include everything
+    - credential: work-github
+      usernames:
+        - your-company-org
+        - company-team
+
+  gitlab:
+    # GitLab repos
+    - credential: my-gitlab
+      usernames:
+        - gitlab-org
+        - gitlab-com
+```
+
+**Benefits:**
+- ✅ Multiple accounts per platform
+- ✅ Organized credentials with clear names
+- ✅ Less repetition in configuration
+- ✅ Different tokens for different users/organizations
+
+#### Complete Example
+
+See [docs/examples/multi-credential-config.yaml](docs/examples/multi-credential-config.yaml) for a complete working example.
+
+```yaml
+credentials:
+  profiles:
+    personal-github:
+      platform: github
+      username: john-personal
+      token: ${GITHUB_PERSONAL_TOKEN}
+
+    work-github:
+      platform: github
+      username: john-work
+      token: ${GITHUB_WORK_TOKEN}
+
+download:
+  base_directory: ./repos
+  max_parallel: 10
+
+targets:
+  github:
+    - credential: personal-github
+      usernames: [torvalds, kubernetes]
+      filters: {forks: false}
+
+    - credential: work-github
+      usernames: [company-org]
+```
+
+**Run with multi-credential config:**
+```bash
+# Set environment variables for your tokens
+export GITHUB_PERSONAL_TOKEN=ghp_your_personal_token
+export GITHUB_WORK_TOKEN=ghp_your_work_token
+
+# Download with config
+repo-dl download --config multi-cred-config.yaml
+```
+
+#### Token Resolution Priority
+
+When resolving which token to use, the system follows this priority:
+
+1. **Profile token** (if target specifies `credential: profile-name`)
+2. **Legacy token** (`github_token` or `gitlab_token` in credentials)
+3. **Environment variable** (`GITHUB_TOKEN` or `GITLAB_TOKEN`)
+
+This allows you to mix old and new formats during migration.
+
+#### Migration from Legacy Format
+
+You can gradually migrate from the legacy format:
+
+**Step 1 - Legacy format (still works):**
+```yaml
+credentials:
+  github_token: ${GITHUB_TOKEN}
+
+targets:
+  - platform: github
+    username: torvalds
+```
+
+**Step 2 - Add profiles while keeping legacy:**
+```yaml
+credentials:
+  github_token: ${GITHUB_TOKEN}  # Keep for existing targets
+  profiles:
+    work-github:
+      platform: github
+      username: work
+      token: ${GITHUB_WORK_TOKEN}
+
+targets:
+  - platform: github
+    username: torvalds  # Uses legacy token
+
+  - platform: github
+    username: company-org
+    credential: work-github  # Uses profile
+```
+
+**Step 3 - Full migration to grouped format:**
+```yaml
+credentials:
+  profiles:
+    personal-github:
+      platform: github
+      username: personal
+      token: ${GITHUB_PERSONAL_TOKEN}
+
+targets:
+  github:
+    - credential: personal-github
+      usernames: [torvalds, kubernetes]
 ```
 
 ### Python API

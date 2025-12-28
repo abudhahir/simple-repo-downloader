@@ -9,9 +9,11 @@ from pydantic import ValidationError
 
 from simple_repo_downloader.config import (
     AppConfig,
+    CredentialProfile,
     Credentials,
     DownloadConfig,
     Target,
+    TargetGroup,
     resolve_env_var,
 )
 
@@ -66,6 +68,43 @@ def test_credentials_with_none_values():
     creds = Credentials()
     assert creds.github_token is None
     assert creds.gitlab_token is None
+
+
+def test_credentials_with_profiles():
+    """Test credentials with named profiles."""
+    creds = Credentials(
+        profiles={
+            'my-github': CredentialProfile(
+                platform='github',
+                username='testuser',
+                token='ghp_test'
+            ),
+            'my-gitlab': CredentialProfile(
+                platform='gitlab',
+                username='gluser',
+                token='glpat_test'
+            )
+        }
+    )
+    assert len(creds.profiles) == 2
+    assert 'my-github' in creds.profiles
+    assert creds.profiles['my-github'].platform == 'github'
+
+
+def test_credentials_mixed_legacy_and_profiles():
+    """Test credentials can have both legacy tokens and profiles."""
+    creds = Credentials(
+        github_token='ghp_legacy',
+        profiles={
+            'work-github': CredentialProfile(
+                platform='github',
+                username='workuser',
+                token='ghp_work'
+            )
+        }
+    )
+    assert creds.github_token == 'ghp_legacy'
+    assert 'work-github' in creds.profiles
 
 
 # Test DownloadConfig
@@ -133,6 +172,22 @@ def test_target_with_filters():
 def test_target_invalid_platform():
     with pytest.raises(ValidationError):
         Target(platform='bitbucket', username='user')
+
+
+def test_target_with_credential_reference():
+    """Test target can reference a credential profile."""
+    target = Target(
+        platform='github',
+        username='testuser',
+        credential='my-github'
+    )
+    assert target.credential == 'my-github'
+
+
+def test_target_credential_defaults_to_none():
+    """Test that credential field defaults to None when not specified."""
+    target = Target(platform='github', username='testuser')
+    assert target.credential is None
 
 
 # Test AppConfig
@@ -260,3 +315,121 @@ def test_load_config_invalid_yaml():
             AppConfig.from_yaml(config_path)
     finally:
         config_path.unlink()
+
+
+def test_app_config_with_grouped_targets():
+    """Test AppConfig with new grouped targets format."""
+    config = AppConfig(
+        credentials=Credentials(
+            profiles={
+                'my-github': CredentialProfile(
+                    platform='github',
+                    username='test',
+                    token='ghp_test'
+                )
+            }
+        ),
+        download=DownloadConfig(),
+        targets={
+            'github': [
+                TargetGroup(
+                    credential='my-github',
+                    usernames=['user1', 'user2']
+                )
+            ]
+        }
+    )
+    assert isinstance(config.targets, dict)
+    assert 'github' in config.targets
+
+
+def test_app_config_validates_missing_credential():
+    """Test AppConfig rejects reference to non-existent credential."""
+    with pytest.raises(ValidationError, match="Credential 'missing' not found"):
+        AppConfig(
+            credentials=Credentials(profiles={}),
+            download=DownloadConfig(),
+            targets={
+                'github': [
+                    TargetGroup(
+                        credential='missing',
+                        usernames=['user1']
+                    )
+                ]
+            }
+        )
+
+
+def test_app_config_validates_platform_mismatch():
+    """Test AppConfig rejects credential with wrong platform."""
+    with pytest.raises(ValidationError, match="gitlab.*github|github.*gitlab"):
+        AppConfig(
+            credentials=Credentials(
+                profiles={
+                    'my-gitlab': CredentialProfile(
+                        platform='gitlab',
+                        username='test',
+                        token='glpat_test'
+                    )
+                }
+            ),
+            download=DownloadConfig(),
+            targets={
+                'github': [  # GitHub target
+                    TargetGroup(
+                        credential='my-gitlab',  # But GitLab credential
+                        usernames=['user1']
+                    )
+                ]
+            }
+        )
+
+
+def test_app_config_validates_flat_format_credential():
+    """Test AppConfig validates credentials in flat format."""
+    with pytest.raises(ValidationError, match="not found"):
+        AppConfig(
+            credentials=Credentials(profiles={}),
+            download=DownloadConfig(),
+            targets=[
+                Target(
+                    platform='github',
+                    username='user1',
+                    credential='missing'
+                )
+            ]
+        )
+
+
+def test_load_grouped_format_from_yaml(tmp_path):
+    """Test loading grouped target format from YAML."""
+    yaml_content = """
+credentials:
+  profiles:
+    my-github:
+      platform: github
+      username: testuser
+      token: ghp_test123
+
+download:
+  base_directory: ./repos
+
+targets:
+  github:
+    - credential: my-github
+      usernames:
+        - user1
+        - user2
+      filters:
+        forks: false
+"""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml_content)
+
+    config = AppConfig.from_yaml(config_file)
+
+    assert isinstance(config.targets, dict)
+    assert 'github' in config.targets
+    assert len(config.targets['github']) == 1
+    assert config.targets['github'][0].credential == 'my-github'
+    assert len(config.targets['github'][0].usernames) == 2

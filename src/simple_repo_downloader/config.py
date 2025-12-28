@@ -1,35 +1,96 @@
 # src/simple_repo_downloader/config.py
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 def resolve_env_var(value: str) -> str:
     """Resolve ${VAR_NAME} syntax to environment variable value."""
     if not isinstance(value, str):
-        return value
+        return value  # type: ignore[return-value]
 
     pattern = r'\$\{([^}]+)\}'
 
-    def replace_var(match):
+    def replace_var(match: re.Match[str]) -> str:
         var_name = match.group(1)
         return os.environ.get(var_name, match.group(0))
 
     return re.sub(pattern, replace_var, value)
 
 
+@dataclass(frozen=True)
+class ResolvedTarget:
+    """Normalized target with resolved credentials.
+
+    This is the internal representation after resolving credential profiles.
+    All targets (flat or grouped format) are converted to this format.
+    """
+    platform: str
+    username: str
+    token: str | None
+    filters: dict[str, bool]
+
+
+class CredentialProfile(BaseModel):
+    """Named credential profile for a platform."""
+    platform: Literal['github', 'gitlab']
+    username: str = Field(min_length=1)
+    token: str = Field(min_length=1)
+
+    @field_validator('username', 'token')
+    @classmethod
+    def validate_non_whitespace(cls, v: str, info: ValidationInfo) -> str:
+        """Validate that field is not empty or whitespace-only."""
+        if not v.strip():
+            raise ValueError(f"{info.field_name} cannot be empty or whitespace")
+        return v
+
+    @field_validator('token', mode='before')
+    @classmethod
+    def resolve_token_env_var(cls, v: str) -> str:
+        """Resolve environment variables in token."""
+        return resolve_env_var(v)
+
+
+class TargetGroup(BaseModel):
+    """Group of usernames sharing a credential."""
+    credential: str = Field(min_length=1)
+    usernames: list[str] = Field(min_length=1)
+    filters: dict[str, bool] = Field(default_factory=dict)
+
+    @field_validator('credential', 'usernames')
+    @classmethod
+    def validate_non_whitespace(cls, v: str | list[str], info: ValidationInfo) -> str | list[str]:
+        """Validate that credential and usernames are not empty or whitespace-only."""
+        field_name = info.field_name
+
+        if field_name == 'credential':
+            if isinstance(v, str) and not v.strip():
+                raise ValueError("Credential name cannot be empty or whitespace")
+            return v
+        else:  # usernames
+            if isinstance(v, list) and not all(u.strip() for u in v):
+                raise ValueError("Usernames cannot be empty or whitespace")
+            return v
+
+
 class Credentials(BaseModel):
     """Authentication credentials for platforms."""
-    github_token: Optional[str] = None
-    gitlab_token: Optional[str] = None
+    # Legacy format (backward compatible)
+    github_token: str | None = None
+    gitlab_token: str | None = None
+
+    # New named profiles
+    profiles: dict[str, CredentialProfile] = Field(default_factory=dict)
 
     @field_validator('github_token', 'gitlab_token', mode='before')
     @classmethod
-    def resolve_env_vars(cls, v):
+    def resolve_env_vars(cls, v: str | None) -> str | None:
         if v is None:
             return v
         return resolve_env_var(v)
@@ -47,25 +108,114 @@ class Target(BaseModel):
     """A platform/username target to download from."""
     platform: Literal['github', 'gitlab']
     username: str
-    filters: Dict[str, bool] = Field(default_factory=dict)
+    credential: str | None = None
+    filters: dict[str, bool] = Field(default_factory=dict)
 
 
 class AppConfig(BaseModel):
     """Complete application configuration."""
     credentials: Credentials
     download: DownloadConfig
-    targets: List[Target]
+    targets: list[Target] | dict[str, list[TargetGroup]]
+
+    @field_validator('targets')
+    @classmethod
+    def validate_targets(cls, v: list[Target] | dict[str, list[TargetGroup]], info: ValidationInfo) -> list[Target] | dict[str, list[TargetGroup]]:
+        """Validate targets format and credential references."""
+        credentials = info.data.get('credentials')
+        if credentials is None:
+            return v
+
+        if isinstance(v, list):
+            # Flat format validation
+            for target in v:
+                if target.credential:
+                    cls._validate_credential_ref(
+                        target.credential,
+                        target.platform,
+                        credentials
+                    )
+        else:
+            # Grouped format validation
+            for platform, groups in v.items():
+                if platform not in ('github', 'gitlab'):
+                    raise ValueError(f"Invalid platform: {platform}")
+                for group in groups:
+                    cls._validate_credential_ref(
+                        group.credential,
+                        platform,
+                        credentials
+                    )
+        return v
+
+    @staticmethod
+    def _validate_credential_ref(cred_name: str, platform: str, credentials: Credentials) -> None:
+        """Validate credential reference exists and matches platform."""
+        if cred_name not in credentials.profiles:
+            raise ValueError(f"Credential '{cred_name}' not found in profiles")
+
+        profile = credentials.profiles[cred_name]
+        if profile.platform != platform:
+            raise ValueError(
+                f"Credential '{cred_name}' is for {profile.platform}, "
+                f"but target uses {platform}"
+            )
+
+    def resolve_targets(self) -> list[ResolvedTarget]:
+        """Convert targets to normalized format with resolved credentials."""
+        resolved = []
+
+        if isinstance(self.targets, list):
+            # Flat format
+            for target in self.targets:
+                token = self._resolve_token(target.platform, target.credential)
+                resolved.append(ResolvedTarget(
+                    platform=target.platform,
+                    username=target.username,
+                    token=token,
+                    filters=target.filters
+                ))
+        else:
+            # Grouped format
+            for platform, groups in self.targets.items():
+                for group in groups:
+                    token = self._resolve_token(platform, group.credential)
+                    for username in group.usernames:
+                        resolved.append(ResolvedTarget(
+                            platform=platform,
+                            username=username,
+                            token=token,
+                            filters=group.filters
+                        ))
+
+        return resolved
+
+    def _resolve_token(self, platform: str, credential: str | None) -> str | None:
+        """Resolve token for a platform/credential combination."""
+        # Priority 1: Explicit credential profile
+        if credential:
+            return self.credentials.profiles[credential].token
+
+        # Priority 2: Legacy platform token
+        if platform == 'github' and self.credentials.github_token:
+            return self.credentials.github_token
+        if platform == 'gitlab' and self.credentials.gitlab_token:
+            return self.credentials.gitlab_token
+
+        # Priority 3: Environment variables
+        env_var = f"{platform.upper()}_TOKEN"
+        return os.environ.get(env_var)
 
     @classmethod
     def from_yaml(cls, path: Path) -> "AppConfig":
         """Load configuration from YAML file."""
         try:
-            with open(path, 'r') as f:
+            with open(path) as f:
                 data = yaml.safe_load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file not found: {path}")
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"Configuration file not found: {path}") from e
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in configuration file: {e}")
+            raise ValueError(f"Invalid YAML in configuration file: {e}") from e
 
         return cls(**data)
 
@@ -77,5 +227,5 @@ class AppConfig(BaseModel):
                 data = self.model_dump(mode='python')
                 data['download']['base_directory'] = str(data['download']['base_directory'])
                 yaml.dump(data, f, default_flow_style=False)
-        except (OSError, IOError) as e:
-            raise IOError(f"Failed to write configuration file: {e}")
+        except OSError as e:
+            raise OSError(f"Failed to write configuration file: {e}") from e
