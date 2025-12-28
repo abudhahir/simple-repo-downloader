@@ -22,6 +22,21 @@ def resolve_env_var(value: str) -> str:
     return re.sub(pattern, replace_var, value)
 
 
+class CredentialProfile(BaseModel):
+    """Named credential profile for a platform."""
+    platform: Literal['github', 'gitlab']
+    username: str
+    token: str
+
+    @field_validator('token', mode='before')
+    @classmethod
+    def resolve_token_env_vars(cls, v: str) -> str:
+        """Resolve environment variables in token."""
+        if v is None:
+            return v
+        return resolve_env_var(v)
+
+
 class Credentials(BaseModel):
     """Authentication credentials for platforms."""
     github_token: Optional[str] = None
