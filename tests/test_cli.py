@@ -28,25 +28,13 @@ def test_cli_empty_repos_list():
         mock_client.list_repositories = mock_list_repositories
         MockClient.return_value = mock_client
 
-        # Test with headless mode
-        result = runner.invoke(cli, [
-            'download', 'github', 'testuser',
-            '--token', 'fake_token',
-            '--headless'
-        ])
-
-        # Should exit gracefully with message
-        assert result.exit_code == 0
-        assert 'Found 0 repositories' in result.output
-        assert 'No repositories to download. Exiting.' in result.output
-
-        # Test without headless mode (dashboard mode)
+        # Test CLI with empty repos
         result = runner.invoke(cli, [
             'download', 'github', 'testuser',
             '--token', 'fake_token'
         ])
 
-        # Should exit gracefully with message (no dashboard should start)
+        # Should exit gracefully with message
         assert result.exit_code == 0
         assert 'Found 0 repositories' in result.output
         assert 'No repositories to download. Exiting.' in result.output
@@ -97,7 +85,6 @@ async def test_cli_uses_progress_printer(tmp_path, monkeypatch):
                         max_parallel=5,
                         output_dir=str(tmp_path),
                         no_forks=False,
-                        headless=False,
                         verbose=False
                     )
 
@@ -161,7 +148,6 @@ async def test_cli_callback_behavior(tmp_path, monkeypatch):
                         max_parallel=5,
                         output_dir=str(tmp_path),
                         no_forks=False,
-                        headless=False,
                         verbose=False
                     )
 

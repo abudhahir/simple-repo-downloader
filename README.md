@@ -141,7 +141,6 @@ repo-dl download <platform> <username> [OPTIONS]
 | `--output-dir PATH` | Output directory | `--output-dir ~/repos` |
 | `--no-forks` | Exclude forked repositories | `--no-forks` |
 | `--config PATH` | Use config file | `--config myconfig.yaml` |
-| `--headless` | Run without interactive dashboard | `--headless` |
 
 #### Examples
 
@@ -294,53 +293,32 @@ results = await downloader.download_all(
 )
 ```
 
-## Interactive Dashboard
+## Progress Output
 
-The download process includes a real-time terminal dashboard showing:
+The download process shows real-time progress updates in your terminal:
 
-- **Progress Table**: Live status of each repository with progress bars
-- **Summary Stats**: Overall counts, active downloads, elapsed time
-- **Event Log**: Recent download events and status changes
-- **Command Shell**: Interactive commands during download
+- Repository status updates as they complete
+- Progress tracking (e.g., "Repo 5/20")
+- State indicators (Completed, Failed, Up-to-date, etc.)
+- Final summary with counts of successful/failed downloads
 
-### Using the Dashboard
-
-Default mode shows the dashboard:
+**Example output:**
 
 ```bash
-repo-dl download github kubernetes
-```
+repo-dl download github kubernetes --max-parallel 10
 
-Disable dashboard with `--headless`:
+# Shows progress as each repository completes:
+[5/20] github/kubernetes/kubernetes: Completed - Cloned successfully
+[6/20] github/kubernetes/test-infra: Completed - Cloned successfully
+[7/20] github/kubernetes/website: Failed - Repository not found
+...
 
-```bash
-repo-dl download github kubernetes --headless
-```
-
-### Available Commands
-
-During download, type commands in the shell:
-
-- `pause <repo>` - Pause a specific download
-- `resume <repo>` - Resume a paused download
-- `skip <repo>` - Skip a repository
-- `status` - Show detailed status
-- `clear-log` - Clear the event log
-- `help` - Show all commands
-- `quit` - Graceful shutdown
-
-**Example:**
-
-```bash
-# Start download
-repo-dl download github microsoft --max-parallel 10
-
-# In the dashboard shell:
-> pause vscode
-> skip deprecated-repo
-> resume vscode
-> status
-> quit
+# Final summary:
+Download Summary:
+  Total: 20
+  Completed: 15
+  Failed: 3
+  Up-to-date: 2
 ```
 
 ## 🔐 Authentication

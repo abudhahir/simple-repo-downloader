@@ -590,7 +590,6 @@ repo-dl list github torvalds --format table
 --no-forks               Exclude forks
 --include-archived       Include archived repositories
 --output-dir PATH        Base output directory
---headless               No interactive dashboard
 ```
 
 ### 7. Library API

@@ -26,9 +26,8 @@ def cli():
 @click.option('--output-dir', type=click.Path(), default='./repos', help='Output directory')
 @click.option('--no-forks', is_flag=True, help='Exclude forked repositories')
 @click.option('--config', type=click.Path(exists=True), help='Config file path')
-@click.option('--headless', is_flag=True, help='Run without interactive dashboard')
 @click.option('--verbose', is_flag=True, help='Show verbose output')
-def download(platform, username, token, max_parallel, output_dir, no_forks, config, headless, verbose):
+def download(platform, username, token, max_parallel, output_dir, no_forks, config, verbose):
     """Download repositories from a platform user/org."""
 
     if config:
@@ -38,7 +37,7 @@ def download(platform, username, token, max_parallel, output_dir, no_forks, conf
     else:
         # Use CLI arguments
         asyncio.run(_download_from_args(
-            platform, username, token, max_parallel, output_dir, no_forks, headless, verbose
+            platform, username, token, max_parallel, output_dir, no_forks, verbose
         ))
 
 
@@ -49,7 +48,6 @@ async def _download_from_args(
     max_parallel: int,
     output_dir: str,
     no_forks: bool,
-    headless: bool,
     verbose: bool
 ):
     """Execute download from CLI arguments."""

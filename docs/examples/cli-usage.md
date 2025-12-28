@@ -73,46 +73,28 @@ repo-dl download github torvalds --output-dir ~/backups/linux
 
 This will create: `~/backups/linux/github/torvalds/linux/`
 
-### Headless mode (no interactive dashboard)
+## Progress Output
 
-```bash
-repo-dl download github myusername --headless
-```
+The download process shows real-time progress updates as each repository completes:
 
-Useful for automation and scripts. Disables the interactive dashboard and runs in simple output mode.
+- Repository status updates displayed as they finish
+- Progress tracking (e.g., "[5/20]")
+- State indicators (Completed, Failed, Up-to-date, etc.)
+- Final summary with download statistics
 
-## Interactive Dashboard
-
-By default, downloads run with an interactive dashboard showing:
-
-- Real-time progress table with status and progress bars
-- Summary statistics (queued/downloading/completed/failed/paused/skipped)
-- Event log with timestamped download events
-- Interactive command shell
-
-### Dashboard Commands
-
-During download, you can type commands in the shell at the bottom:
-
-- `pause <repo>` - Pause a specific repository download
-- `resume <repo>` - Resume a paused repository
-- `skip <repo>` - Skip a repository (won't download)
-- `status` - Show detailed status
-- `clear-log` - Clear the event log panel
-- `help` - Show available commands
-- `quit` - Graceful shutdown (finish current downloads)
-
-**Examples:**
+**Example output:**
 
 ```
-> pause github/torvalds/linux
-> skip github/microsoft/unwanted-repo
-> resume github/torvalds/linux
-> status
-> quit
-```
+[1/20] github/torvalds/linux: Completed - Cloned successfully
+[2/20] github/torvalds/subsurface: Completed - Cloned successfully
+[3/20] github/torvalds/test-repo: Failed - Repository not found
+...
 
-Repository names should be in the format: `platform/username/reponame`
+Download Summary:
+  Total: 20
+  Completed: 18
+  Failed: 2
+```
 
 ## Complete Examples
 
@@ -205,8 +187,7 @@ The tool respects these environment variables:
 1. **Start small**: Test with a user that has few repos first
 2. **Use authentication**: Avoid rate limits by providing a token
 3. **Use config files**: Easier to manage multiple targets and filters
-4. **Monitor dashboard**: The interactive shell helps troubleshoot in real-time
-5. **Use headless mode**: For automation and CI/CD pipelines
+4. **Monitor progress**: Watch the terminal output for real-time status updates
 
 ## Getting Help
 
