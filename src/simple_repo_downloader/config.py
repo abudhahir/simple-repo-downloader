@@ -118,6 +118,49 @@ class AppConfig(BaseModel):
     download: DownloadConfig
     targets: Union[List[Target], Dict[str, List[TargetGroup]]]
 
+    @field_validator('targets')
+    @classmethod
+    def validate_targets(cls, v: Union[List[Target], Dict[str, List[TargetGroup]]], info: ValidationInfo) -> Union[List[Target], Dict[str, List[TargetGroup]]]:
+        """Validate targets format and credential references."""
+        credentials = info.data.get('credentials')
+        if credentials is None:
+            return v
+
+        if isinstance(v, list):
+            # Flat format validation
+            for target in v:
+                if target.credential:
+                    cls._validate_credential_ref(
+                        target.credential,
+                        target.platform,
+                        credentials
+                    )
+        else:
+            # Grouped format validation
+            for platform, groups in v.items():
+                if platform not in ('github', 'gitlab'):
+                    raise ValueError(f"Invalid platform: {platform}")
+                for group in groups:
+                    cls._validate_credential_ref(
+                        group.credential,
+                        platform,
+                        credentials
+                    )
+        return v
+
+    @staticmethod
+    def _validate_credential_ref(cred_name: str, platform: str, credentials: Credentials) -> None:
+        """Validate credential reference exists and matches platform."""
+        if cred_name not in credentials.profiles:
+            raise ValueError(f"Credential '{cred_name}' not found in profiles")
+
+        profile = credentials.profiles[cred_name]
+        if profile.platform != platform:
+            raise ValueError(
+                f"Credential '{cred_name}' is for {profile.platform}, "
+                f"but target uses {platform}"
+            )
+
     @classmethod
     def from_yaml(cls, path: Path) -> "AppConfig":
         """Load configuration from YAML file."""

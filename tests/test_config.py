@@ -341,3 +341,61 @@ def test_app_config_with_grouped_targets():
     )
     assert isinstance(config.targets, dict)
     assert 'github' in config.targets
+
+
+def test_app_config_validates_missing_credential():
+    """Test AppConfig rejects reference to non-existent credential."""
+    with pytest.raises(ValidationError, match="Credential 'missing' not found"):
+        AppConfig(
+            credentials=Credentials(profiles={}),
+            download=DownloadConfig(),
+            targets={
+                'github': [
+                    TargetGroup(
+                        credential='missing',
+                        usernames=['user1']
+                    )
+                ]
+            }
+        )
+
+
+def test_app_config_validates_platform_mismatch():
+    """Test AppConfig rejects credential with wrong platform."""
+    with pytest.raises(ValidationError, match="gitlab.*github|github.*gitlab"):
+        AppConfig(
+            credentials=Credentials(
+                profiles={
+                    'my-gitlab': CredentialProfile(
+                        platform='gitlab',
+                        username='test',
+                        token='glpat_test'
+                    )
+                }
+            ),
+            download=DownloadConfig(),
+            targets={
+                'github': [  # GitHub target
+                    TargetGroup(
+                        credential='my-gitlab',  # But GitLab credential
+                        usernames=['user1']
+                    )
+                ]
+            }
+        )
+
+
+def test_app_config_validates_flat_format_credential():
+    """Test AppConfig validates credentials in flat format."""
+    with pytest.raises(ValidationError, match="not found"):
+        AppConfig(
+            credentials=Credentials(profiles={}),
+            download=DownloadConfig(),
+            targets=[
+                Target(
+                    platform='github',
+                    username='user1',
+                    credential='missing'
+                )
+            ]
+        )
