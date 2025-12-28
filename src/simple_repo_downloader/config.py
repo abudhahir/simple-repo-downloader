@@ -30,10 +30,8 @@ class CredentialProfile(BaseModel):
 
     @field_validator('token', mode='before')
     @classmethod
-    def resolve_token_env_vars(cls, v: str) -> str:
+    def resolve_token_env_var(cls, v: str) -> str:
         """Resolve environment variables in token."""
-        if v is None:
-            return v
         return resolve_env_var(v)
 
 
