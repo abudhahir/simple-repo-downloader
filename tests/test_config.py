@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from simple_repo_downloader.config import (
     AppConfig,
+    CredentialProfile,
     Credentials,
     DownloadConfig,
     Target,
@@ -66,6 +67,43 @@ def test_credentials_with_none_values():
     creds = Credentials()
     assert creds.github_token is None
     assert creds.gitlab_token is None
+
+
+def test_credentials_with_profiles():
+    """Test credentials with named profiles."""
+    creds = Credentials(
+        profiles={
+            'my-github': CredentialProfile(
+                platform='github',
+                username='testuser',
+                token='ghp_test'
+            ),
+            'my-gitlab': CredentialProfile(
+                platform='gitlab',
+                username='gluser',
+                token='glpat_test'
+            )
+        }
+    )
+    assert len(creds.profiles) == 2
+    assert 'my-github' in creds.profiles
+    assert creds.profiles['my-github'].platform == 'github'
+
+
+def test_credentials_mixed_legacy_and_profiles():
+    """Test credentials can have both legacy tokens and profiles."""
+    creds = Credentials(
+        github_token='ghp_legacy',
+        profiles={
+            'work-github': CredentialProfile(
+                platform='github',
+                username='workuser',
+                token='ghp_work'
+            )
+        }
+    )
+    assert creds.github_token == 'ghp_legacy'
+    assert 'work-github' in creds.profiles
 
 
 # Test DownloadConfig

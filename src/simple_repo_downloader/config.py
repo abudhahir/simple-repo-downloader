@@ -45,8 +45,12 @@ class CredentialProfile(BaseModel):
 
 class Credentials(BaseModel):
     """Authentication credentials for platforms."""
+    # Legacy format (backward compatible)
     github_token: Optional[str] = None
     gitlab_token: Optional[str] = None
+
+    # New named profiles
+    profiles: Dict[str, CredentialProfile] = Field(default_factory=dict)
 
     @field_validator('github_token', 'gitlab_token', mode='before')
     @classmethod
