@@ -1,6 +1,7 @@
 # src/simple_repo_downloader/config.py
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Union
 
@@ -20,6 +21,19 @@ def resolve_env_var(value: str) -> str:
         return os.environ.get(var_name, match.group(0))
 
     return re.sub(pattern, replace_var, value)
+
+
+@dataclass(frozen=True)
+class ResolvedTarget:
+    """Normalized target with resolved credentials.
+
+    This is the internal representation after resolving credential profiles.
+    All targets (flat or grouped format) are converted to this format.
+    """
+    platform: str
+    username: str
+    token: Optional[str]
+    filters: Dict[str, bool]
 
 
 class CredentialProfile(BaseModel):
