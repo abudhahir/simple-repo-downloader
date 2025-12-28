@@ -211,3 +211,74 @@ async def test_cli_callback_behavior(tmp_path, monkeypatch):
                     assert call_args.kwargs['current'] == 1
                     assert call_args.kwargs['total'] == 1
                     assert call_args.kwargs['state'].value == 'completed'
+
+
+@pytest.mark.asyncio
+async def test_cli_with_config_profiles(tmp_path):
+    """Test CLI using config with credential profiles."""
+    from simple_repo_downloader.cli import _download_from_config
+    from simple_repo_downloader.config import AppConfig
+    from simple_repo_downloader.models import RepoInfo
+    from unittest.mock import AsyncMock, patch
+
+    # Create config with profiles
+    yaml_content = """
+credentials:
+  profiles:
+    my-github:
+      platform: github
+      username: testuser
+      token: ghp_profile_token
+
+download:
+  base_directory: ./repos
+
+targets:
+  github:
+    - credential: my-github
+      usernames:
+        - user1
+        - user2
+"""
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml_content)
+
+    # Load config
+    config = AppConfig.from_yaml(config_file)
+
+    # Mock repos returned by API
+    mock_repos = [
+        RepoInfo(
+            platform='github',
+            username='user1',
+            name='repo1',
+            clone_url='https://github.com/user1/repo1.git',
+            is_fork=False,
+            is_private=False,
+            is_archived=False,
+            size_kb=100,
+            default_branch='main'
+        )
+    ]
+
+    mock_client = AsyncMock()
+    mock_client.list_repositories = AsyncMock(return_value=mock_repos)
+
+    with patch('simple_repo_downloader.cli.aiohttp.ClientSession'):
+        with patch('simple_repo_downloader.cli.GitHubClient', return_value=mock_client) as mock_github:
+            with patch('simple_repo_downloader.cli.DownloadEngine') as mock_engine_class:
+                from simple_repo_downloader.downloader import DownloadResults
+                mock_engine = AsyncMock()
+                mock_engine.download_all = AsyncMock(return_value=DownloadResults(successful=[], issues=[]))
+                mock_engine_class.return_value = mock_engine
+
+                # Run download from config
+                await _download_from_config(config)
+
+                # Verify GitHubClient was called with resolved token
+                # Should be called twice (once for user1, once for user2)
+                assert mock_github.call_count == 2
+
+                # Verify token from profile was used
+                for call in mock_github.call_args_list:
+                    assert call.kwargs['token'] == 'ghp_profile_token'

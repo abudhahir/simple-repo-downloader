@@ -7,7 +7,7 @@ import aiohttp
 import click
 
 from .api_client import GitHubClient, GitLabClient
-from .config import AppConfig, DownloadConfig
+from .config import AppConfig, DownloadConfig, ResolvedTarget
 from .downloader import DownloadEngine
 from .progress import ProgressPrinter
 
@@ -191,20 +191,20 @@ async def _download_from_args(
 
 async def _download_from_config(app_config: AppConfig):
     """Execute download from configuration file."""
+    # Resolve all targets to normalized format with credentials
+    resolved_targets = app_config.resolve_targets()
+
     async with aiohttp.ClientSession() as session:
-        for target in app_config.targets:
-            # Get appropriate token
+        for target in resolved_targets:
+            # Create appropriate client with resolved token
             if target.platform == 'github':
-                token = app_config.credentials.github_token
-                client = GitHubClient(token=token, session=session)
+                client = GitHubClient(token=target.token, session=session)
             else:
-                token = app_config.credentials.gitlab_token
-                client = GitLabClient(token=token, session=session)
+                client = GitLabClient(token=target.token, session=session)
 
             click.echo(f"Fetching {target.platform} repositories for {target.username}...")
             repos = await client.list_repositories(target.username, target.filters)
             click.echo(f"Found {len(repos)} repositories")
-
 
             # Handle empty repository list
             if not repos:
@@ -212,7 +212,7 @@ async def _download_from_config(app_config: AppConfig):
                 continue
 
             engine = DownloadEngine(app_config.download)
-            results = await engine.download_all(repos, token=token)
+            results = await engine.download_all(repos, token=target.token)
 
             click.echo(f"✓ Downloaded: {len(results.successful)}, Issues: {len(results.issues)}")
 
