@@ -176,8 +176,17 @@ class AppConfig(BaseModel):
                     filters=target.filters
                 ))
         else:
-            # Grouped format - TODO in next task
-            pass
+            # Grouped format
+            for platform, groups in self.targets.items():
+                for group in groups:
+                    token = self._resolve_token(platform, group.credential)
+                    for username in group.usernames:
+                        resolved.append(ResolvedTarget(
+                            platform=platform,
+                            username=username,
+                            token=token,
+                            filters=group.filters
+                        ))
 
         return resolved
 
