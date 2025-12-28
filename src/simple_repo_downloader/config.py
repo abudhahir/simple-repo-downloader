@@ -116,7 +116,7 @@ class AppConfig(BaseModel):
     """Complete application configuration."""
     credentials: Credentials
     download: DownloadConfig
-    targets: List[Target]
+    targets: Union[List[Target], Dict[str, List[TargetGroup]]]
 
     @classmethod
     def from_yaml(cls, path: Path) -> "AppConfig":

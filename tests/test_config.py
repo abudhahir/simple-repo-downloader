@@ -13,6 +13,7 @@ from simple_repo_downloader.config import (
     Credentials,
     DownloadConfig,
     Target,
+    TargetGroup,
     resolve_env_var,
 )
 
@@ -314,3 +315,29 @@ def test_load_config_invalid_yaml():
             AppConfig.from_yaml(config_path)
     finally:
         config_path.unlink()
+
+
+def test_app_config_with_grouped_targets():
+    """Test AppConfig with new grouped targets format."""
+    config = AppConfig(
+        credentials=Credentials(
+            profiles={
+                'my-github': CredentialProfile(
+                    platform='github',
+                    username='test',
+                    token='ghp_test'
+                )
+            }
+        ),
+        download=DownloadConfig(),
+        targets={
+            'github': [
+                TargetGroup(
+                    credential='my-github',
+                    usernames=['user1', 'user2']
+                )
+            ]
+        }
+    )
+    assert isinstance(config.targets, dict)
+    assert 'github' in config.targets
