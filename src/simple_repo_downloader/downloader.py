@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from .config import DownloadConfig
-from .models import DownloadIssue, DownloadResult, RepoInfo, IssueType
+from .models import DownloadIssue, DownloadResult, RepoInfo, IssueType, StateEnum
 
 
 @dataclass
@@ -25,6 +25,80 @@ class DownloadEngine:
         self.results: List[DownloadResult] = []
         self.issues: List[DownloadIssue] = []
         self.status_callback = status_callback
+
+    async def _check_existing_repo(self, repo: RepoInfo) -> tuple[StateEnum, Optional[str]]:
+        """
+        Check if repo exists locally and determine its git status.
+        Returns (state, message) tuple.
+        """
+        dest = self.config.base_directory / repo.platform / repo.username / repo.name
+
+        # Check if directory exists
+        if not dest.exists():
+            return (None, None)  # Doesn't exist, proceed with clone
+
+        # Check if it's a git repo
+        if not (dest / '.git').exists():
+            return (StateEnum.FAILED, f"Directory exists but is not a git repo: {dest}")
+
+        try:
+            # Fetch latest from remote
+            fetch_result = await asyncio.create_subprocess_exec(
+                'git', '-C', str(dest), 'fetch',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await fetch_result.wait()
+
+            # Check for uncommitted changes
+            status_result = await asyncio.create_subprocess_exec(
+                'git', '-C', str(dest), 'status', '--porcelain',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await status_result.communicate()
+            has_uncommitted_changes = len(stdout.strip()) > 0
+
+            # Check if behind/ahead of remote
+            rev_list_result = await asyncio.create_subprocess_exec(
+                'git', '-C', str(dest), 'rev-list', '--left-right', '--count', 'HEAD...@{upstream}',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await rev_list_result.communicate()
+
+            if rev_list_result.returncode == 0:
+                parts = stdout.decode().strip().split()
+                ahead = int(parts[0]) if len(parts) > 0 else 0
+                behind = int(parts[1]) if len(parts) > 1 else 0
+
+                # Decision tree based on user preferences
+                if has_uncommitted_changes and behind > 0:
+                    return (StateEnum.UNCOMMITTED_CHANGES, f"Has uncommitted changes, {behind} commits behind")
+                elif has_uncommitted_changes and behind == 0:
+                    return (StateEnum.UP_TO_DATE, "Up to date (uncommitted changes)")
+                elif ahead > 0 and behind == 0:
+                    return (StateEnum.AHEAD, f"{ahead} commits ahead of remote")
+                elif behind > 0 and not has_uncommitted_changes:
+                    # Pull latest changes
+                    pull_result = await asyncio.create_subprocess_exec(
+                        'git', '-C', str(dest), 'pull',
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await pull_result.wait()
+                    if pull_result.returncode == 0:
+                        return (StateEnum.UPDATED, f"Pulled {behind} commits")
+                    else:
+                        return (StateEnum.FAILED, "Failed to pull updates")
+                else:
+                    return (StateEnum.UP_TO_DATE, "Up to date")
+            else:
+                # No upstream branch or other error
+                return (StateEnum.UP_TO_DATE, "No upstream branch")
+
+        except Exception as e:
+            return (StateEnum.FAILED, f"Git status check failed: {str(e)}")
 
     def _inject_token(self, clone_url: str, platform: str, token: Optional[str]) -> str:
         """Inject authentication token into clone URL."""
@@ -99,9 +173,23 @@ class DownloadEngine:
             try:
                 repo = await self.download_queue.get()
 
+                # Check if repo already exists locally
+                existing_state, existing_message = await self._check_existing_repo(repo)
+
+                if existing_state is not None:
+                    # Repo exists, handle based on state
+                    if self.status_callback:
+                        await self.status_callback(repo, existing_state.value, 100, existing_message)
+
+                    if existing_state in [StateEnum.UPDATED, StateEnum.UP_TO_DATE]:
+                        self.results.append(DownloadResult(repo=repo, success=True))
+                    # For other states (UNCOMMITTED_CHANGES, AHEAD), just report status
+                    self.download_queue.task_done()
+                    continue
+
                 # Notify status: starting download
                 if self.status_callback:
-                    await self.status_callback(repo, "downloading", 0)
+                    await self.status_callback(repo, "downloading", 0, None)
 
                 try:
                     async with self.semaphore:
@@ -111,31 +199,33 @@ class DownloadEngine:
                         )
                         # Notify status: completed
                         if self.status_callback:
-                            await self.status_callback(repo, "completed", 100)
+                            await self.status_callback(repo, "completed", 100, None)
                 except FileExistsError as e:
+                    error_msg = str(e)
                     self.issues.append(
                         DownloadIssue(
                             repo=repo,
                             issue_type=IssueType.CONFLICT,
-                            message=str(e),
+                            message=error_msg,
                             existing_path=self.config.base_directory / repo.platform / repo.username / repo.name
                         )
                     )
-                    # Notify status: failed
+                    # Notify status: failed with error message
                     if self.status_callback:
-                        await self.status_callback(repo, "failed", 0)
+                        await self.status_callback(repo, "failed", 0, error_msg)
                 except Exception as e:
+                    error_msg = str(e)
                     issue_type = self._classify_error(e)
                     self.issues.append(
                         DownloadIssue(
                             repo=repo,
                             issue_type=issue_type,
-                            message=str(e)
+                            message=error_msg
                         )
                     )
-                    # Notify status: failed
+                    # Notify status: failed with error message
                     if self.status_callback:
-                        await self.status_callback(repo, "failed", 0)
+                        await self.status_callback(repo, "failed", 0, error_msg)
                 finally:
                     self.download_queue.task_done()
             except asyncio.CancelledError:

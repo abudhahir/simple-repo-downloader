@@ -5,6 +5,26 @@ import aiohttp
 from .models import RepoInfo, RateLimitInfo
 
 
+class APIError(Exception):
+    """Exception raised when API request fails."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int,
+        platform: str,
+        response_body: Optional[Dict] = None
+    ):
+        self.message = message
+        self.status_code = status_code
+        self.platform = platform
+        self.response_body = response_body or {}
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.platform} API error ({self.status_code}): {self.message}"
+
+
 class PlatformClient(ABC):
     """Abstract base class for platform API clients."""
 
@@ -47,10 +67,23 @@ class GitHubClient(PlatformClient):
         repos = []
         page = 1
 
+        # Check if we're fetching authenticated user's repos (to include private)
+        is_authenticated_user = False
+        if self.token:
+            async with self.session.get(f"{self.BASE_URL}/user", headers=self.headers) as user_response:
+                if user_response.status == 200:
+                    user_data = await user_response.json()
+                    is_authenticated_user = user_data.get('login', '').lower() == username.lower()
+
         while True:
-            # Try user endpoint first, fall back to org
-            url = f"{self.BASE_URL}/users/{username}/repos"
-            params = {'per_page': 100, 'page': page}
+            # Use /user/repos for authenticated user to get private repos
+            if is_authenticated_user:
+                url = f"{self.BASE_URL}/user/repos"
+                params = {'per_page': 100, 'page': page, 'affiliation': 'owner'}
+            else:
+                # Try user endpoint first, fall back to org
+                url = f"{self.BASE_URL}/users/{username}/repos"
+                params = {'per_page': 100, 'page': page}
 
             async with self.session.get(url, headers=self.headers, params=params) as response:
                 if response.status == 404:
@@ -58,10 +91,24 @@ class GitHubClient(PlatformClient):
                     url = f"{self.BASE_URL}/orgs/{username}/repos"
                     async with self.session.get(url, headers=self.headers, params=params) as org_response:
                         if org_response.status != 200:
-                            break
+                            error_body = await org_response.json() if org_response.content_type == 'application/json' else {}
+                            error_msg = error_body.get('message', f'HTTP {org_response.status}')
+                            raise APIError(
+                                message=error_msg,
+                                status_code=org_response.status,
+                                platform='github',
+                                response_body=error_body
+                            )
                         data = await org_response.json()
                 elif response.status != 200:
-                    break
+                    error_body = await response.json() if response.content_type == 'application/json' else {}
+                    error_msg = error_body.get('message', f'HTTP {response.status}')
+                    raise APIError(
+                        message=error_msg,
+                        status_code=response.status,
+                        platform='github',
+                        response_body=error_body
+                    )
                 else:
                     data = await response.json()
 

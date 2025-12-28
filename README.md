@@ -93,17 +93,20 @@ This will download all of Linus Torvalds' public repositories to `./repos/github
 ### 2. Download with authentication (for private repos)
 
 ```bash
-# Set your GitHub token
+# Set your GitHub token - it's automatically detected!
 export GITHUB_TOKEN=ghp_your_token_here
 
-# Download your repos
+# Download your repos (token used automatically)
 repo-dl download github your-username
 ```
 
 ### 3. Download from GitLab
 
 ```bash
+# Set your GitLab token - it's automatically detected!
 export GITLAB_TOKEN=glpat_your_token_here
+
+# Download GitLab repos (token used automatically)
 repo-dl download gitlab your-username
 ```
 
@@ -323,6 +326,21 @@ Download Summary:
 
 ## 🔐 Authentication
 
+Authentication tokens enable downloading private repositories and provide higher API rate limits. The tool **automatically detects** tokens from environment variables based on the platform you're using.
+
+### Token Auto-Detection
+
+The tool automatically reads:
+- `GITHUB_TOKEN` environment variable when downloading from GitHub
+- `GITLAB_TOKEN` environment variable when downloading from GitLab
+
+You don't need to specify `--token` if the environment variable is set!
+
+**Token Priority:**
+1. `--token` flag (if provided) - highest priority
+2. Platform-specific environment variable (`GITHUB_TOKEN` or `GITLAB_TOKEN`)
+3. No token (public repos only)
+
 ### GitHub Personal Access Token
 
 1. Go to https://github.com/settings/tokens
@@ -336,11 +354,11 @@ Download Summary:
 
 **Usage:**
 ```bash
-# Option 1: Environment variable (recommended)
+# Option 1: Environment variable (recommended - auto-detected!)
 export GITHUB_TOKEN=ghp_your_token_here
-repo-dl download github your-username
+repo-dl download github your-username  # Token automatically used
 
-# Option 2: Direct in command
+# Option 2: Direct in command (overrides environment variable)
 repo-dl download github your-username --token ghp_your_token_here
 
 # Option 3: In config file
@@ -358,6 +376,21 @@ credentials:
    - ✅ `read_repository`
 4. Click "Create personal access token"
 5. Copy the token (starts with `glpat-`)
+
+**Usage:**
+```bash
+# Option 1: Environment variable (recommended - auto-detected!)
+export GITLAB_TOKEN=glpat_your_token_here
+repo-dl download gitlab your-username  # Token automatically used
+
+# Option 2: Direct in command (overrides environment variable)
+repo-dl download gitlab your-username --token glpat_your_token_here
+
+# Option 3: In config file
+# config.yaml
+credentials:
+  gitlab_token: ${GITLAB_TOKEN}
+```
 
 **For self-hosted GitLab:**
 ```yaml
